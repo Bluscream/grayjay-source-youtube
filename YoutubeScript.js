@@ -212,15 +212,15 @@ source.getHome = () => {
         initialData = _prefetchHomeAuth;
         _prefetchHomeUsed = true;
     }
-    else
-        initialData = requestInitialData(URL_HOME, USE_MOBILE_PAGES, true);
+    else if(bridge.isLoggedIn())
+        initialData = requestInitialData(URL_CONTEXT_M, USE_MOBILE_PAGES, true);
+	else
+		initialData = requestInitialData(URL_HOME, USE_MOBILE_PAGES, true);
 	const tabs = extractPage_Tabs(initialData);
 	if(tabs.length == 0)
 		throw new ScriptException("No tabs found..");
     if(tabs[0].videos.length > 0) {
-			if (deArrow_isEnabled()) {
-				tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
-			}
+			tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
 	    return new RichGridPager(tabs[0], {}, USE_MOBILE_PAGES, true);
     } else {
         return source.getTrending();
@@ -280,7 +280,7 @@ source.search = function(query, type, order, filters) {
 	const data = requestSearch(query, false, param);
     let searchResults = extractSearch_SearchResults(data);
 
-    if (searchResults.videos?.length > 0 && deArrow_isEnabled()) {
+    if (searchResults.videos?.length > 0) {
         searchResults.videos = deArrow_enhanceVideosWithAlternativeMetadata(searchResults.videos);
     }
 
@@ -312,7 +312,7 @@ source.searchChannelContents = function(channelUrl, query, type, order, filters)
     if(!tab)
         throw new ScriptException("No search tab found");
 
-    if (tab.videos?.length > 0 && deArrow_isEnabled()) {
+    if (tab.videos?.length > 0) {
         tab.videos = deArrow_enhanceVideosWithAlternativeMetadata(tab.videos);
     }
 
@@ -416,7 +416,7 @@ source.getContentDetails = (url, useAuth) => {
 		console.log("Initial Player Data", initialPlayerData);
 	}
 
-	const videoDetails = extractVideoPage_VideoDetails(initialData, initialPlayerData, {
+	let videoDetails = extractVideoPage_VideoDetails(initialData, initialPlayerData, {
 		url: url
 	}, jsUrl);
 	if(videoDetails == null)
@@ -474,9 +474,7 @@ source.getContentDetails = (url, useAuth) => {
         }
 	}
 
-	if (deArrow_isEnabled()) {
-		deArrow_enhanceVideosWithAlternativeMetadata([videoDetails]);
-	}
+	[videoDetails] = deArrow_enhanceVideosWithAlternativeMetadata([videoDetails]);
 
 	const finalResult = videoDetails;
 	finalResult.__initialData = initialData;
@@ -1001,7 +999,7 @@ source.getChannelContents = (url, type, order, filters) => {
 		return new VideoPager([], false);
 	}
 
-	if (tab.videos.length > 0 && deArrow_isEnabled()) {
+	if (tab.videos.length > 0) {
 		tab.videos = deArrow_enhanceVideosWithAlternativeMetadata(tab.videos);
 	}
 
@@ -1157,7 +1155,7 @@ source.getPlaylist = function (url) {
 			videos[0].thumbnails.sources.length > 0)
 			thumbnail = videos[0].thumbnails.sources[videos[0].thumbnails.sources.length - 1].url;
 
-		if (videos && videos.length > 0 && deArrow_isEnabled()) {
+		if (videos && videos.length > 0) {
 			deArrow_enhanceVideosWithAlternativeMetadata(videos);
 		}
 
@@ -1725,7 +1723,7 @@ class RichGridPager extends VideoPager {
 				    newItemSection.videos = vids;
 				}
 
-				if (newItemSection.videos?.length > 0 && deArrow_isEnabled()) {
+				if (newItemSection.videos?.length > 0) {
 					newItemSection.videos = deArrow_enhanceVideosWithAlternativeMetadata(newItemSection.videos);
 				}
 
@@ -2312,55 +2310,95 @@ function extractSearch_SearchResults(data, contextData) {
 	return {};
 }
 
-function deArrow_isEnabled() {
-	return IS_TESTING || _settings["deArrowEnabledTitles"] || _settings["deArrowEnabledThumbnails"];
-}
-
 /**
  * @param {PlatformVideo[]} videos
  */
 function deArrow_enhanceVideosWithAlternativeMetadata(videos) {
-	let reqs = http.batch();
-	for (const video of videos) {
+	const isEnabledForTitles = IS_TESTING || _settings["deArrowEnabledTitles"];
+	const isEnabledForThumbnails = IS_TESTING || _settings["deArrowEnabledThumbnails"];
+
+	if (!isEnabledForTitles && !isEnabledForThumbnails) {
+		// DeArrow functionality disabled. Do not fetch alternative metadata.
+		return videos;
+	}
+
+	const unprocessedVideos = videos
+		.filter((video) => (
+			(isEnabledForTitles && !video.alternativeName) ||
+			(isEnabledForThumbnails && !video.thumbnails.sources.find(({ type }) => type === "alternative"))
+		));
+
+	const videoIdToDeArrowResponseMap = deArrow_fetchAlternativeMetadata(
+		unprocessedVideos.map((video) => video.id.value)
+	);
+
+	for (const video of unprocessedVideos) {
+		const deArrowResponse = videoIdToDeArrowResponseMap[video.id.value];
+
+		if (deArrowResponse == null) {
+			log(`Got a null response from DeArrow for video ${ video.id.value }. DeArrow servers might be down.`);
+			continue;
+		}
+
+		deArrow_applyAlternativeMetadata(video, { // modifies `video` in-place
+			titles: isEnabledForTitles ? deArrowResponse.titles : null,
+			thumbnails: isEnabledForThumbnails ? deArrowResponse.thumbnails : null,
+		});
+	}
+
+	return videos;
+}
+
+/**
+ * @param {string[]} videoIds
+ */
+function deArrow_fetchAlternativeMetadata(videoIds) {
+	const reqs = http.batch();
+	for (const videoId of videoIds) {
 		// TODO: find a way to speed this up
 		// DeArrow API doesn't have a bulk requests endpoint :(
-		reqs = reqs.GET(`${URL_YOUTUBE_DEARROW_DATA}?videoID=${video.id.value}`, {});
+		reqs.GET(`${URL_YOUTUBE_DEARROW_DATA}?videoID=${videoId}`, {});
 	}
 
 	const resps = reqs.execute();
 	const jsons = resps.map((resp) => JSON.parse(resp.body));
 
-	for (let i = 0; i < jsons.length; i++) {
-		const video = videos[i];
-		const deArrowResp = jsons[i];
+	return Object.fromEntries(jsons.map((deArrowResponse, index) => [videoIds[index], deArrowResponse]));
+}
 
-		if (IS_TESTING || _settings["deArrowEnabledTitles"]) {
-			const bestTitle = deArrow_findBest(deArrowResp.titles);
-			if (bestTitle) {
-				video.alternativeName = bestTitle.title;
-			}
-		}
-
-		if (IS_TESTING || _settings["deArrowEnabledThumbnails"]) {
-			const bestThumbnail = deArrow_findBest(deArrowResp.thumbnails);
-			if (bestThumbnail) {
-				/*
-				* TODO: fetch thumbnail headers at least once, to know if DeArrow has them generated.
-				* From the DeArrow docs:
-				*   Response codes (PLEASE READ):
-				*   200: Ok
-				*   204: No content, failed to generate, or chose not to generate
-				*/
-				video.thumbnails.sources.push({
-					type: "alternative",
-					url: `${URL_YOUTUBE_DEARROW_THUMBNAIL}?videoID=${video.id.value}&time=${bestThumbnail.timestamp}`,
-					quality: 404
-				})
-			}
+/**
+ * @param {PlatformVideo} video
+ * @param {Object} deArrowResponse
+ * @param {Object[] | null} deArrowResponse.titles
+ * @param {Object[] | null} deArrowResponse.thumbnails
+ */
+function deArrow_applyAlternativeMetadata(video, { titles = null, thumbnails = null }) {
+	if (titles) {
+		const bestTitle = deArrow_findBest(titles);
+		if (bestTitle) {
+			video.alternativeName = bestTitle.title;
 		}
 	}
 
-	return videos;
+	if (thumbnails) {
+		const bestThumbnail = deArrow_findBest(thumbnails);
+		if (bestThumbnail) {
+			/*
+			* TODO: fetch thumbnail headers at least once, to know if DeArrow has them generated.
+			* From the DeArrow docs:
+			*   Response codes (PLEASE READ):
+			*   200: Ok
+			*   204: No content, failed to generate, or chose not to generate
+			*/
+			video.thumbnails.sources.push({
+				type: "alternative",
+				url: `${URL_YOUTUBE_DEARROW_THUMBNAIL}?videoID=${video.id.value}&time=${bestThumbnail.timestamp}`,
+				quality: 404
+			})
+		}
+	}
+
+	return video;
 }
 
 /**
@@ -3593,7 +3631,7 @@ function extractNavigationEndpoint_Url(navEndpoint, baseUrl) {
 }
 
 function extractAgoTextRuns_Timestamp(runs) {
-	const runStr = extractRuns_String(runs);
+	const runStr = (typeof runs === "string") ? runs : extractRuns_String(runs);
 	return extractAgoText_Timestamp(runStr);
 }
 function extractAgoText_Timestamp(str) {
