@@ -2334,6 +2334,11 @@ function deArrow_enhanceVideosWithAlternativeMetadata(videos) {
 		const video = videos[i];
 		const deArrowResp = jsons[i];
 
+		if (deArrowResp == null) {
+			log(`Got a null response from DeArrow for video ${ video.id.value }. DeArrow servers might be down.`);
+			continue;
+		}
+
 		if (IS_TESTING || _settings["deArrowEnabledTitles"]) {
 			const bestTitle = deArrow_findBest(deArrowResp.titles);
 			if (bestTitle) {
