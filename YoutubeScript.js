@@ -2314,8 +2314,16 @@ function extractSearch_SearchResults(data, contextData) {
 	return {};
 }
 
+function deArrow_isEnabledForTitles() {
+	return IS_TESTING || _settings["deArrowEnabledTitles"];
+}
+
+function deArrow_isEnabledForThumbnails() {
+	return IS_TESTING || _settings["deArrowEnabledThumbnails"];
+}
+
 function deArrow_isEnabled() {
-	return IS_TESTING || _settings["deArrowEnabledTitles"] || _settings["deArrowEnabledThumbnails"];
+	return deArrow_isEnabledForTitles() || deArrow_isEnabledForThumbnails();
 }
 
 /**
@@ -2324,9 +2332,17 @@ function deArrow_isEnabled() {
 function deArrow_enhanceVideosWithAlternativeMetadata(videos) {
 	let reqs = http.batch();
 	for (const video of videos) {
+		if (
+			(deArrow_isEnabledForTitles() && !!video.alternativeName) ||
+			(deArrow_isEnabledForThumbnails() && !!video.thumbnails.sources.find(({ type }) => type === "alternative"))
+		) {
+			// Already has alternative metadata
+			continue;
+		}
+
 		// TODO: find a way to speed this up
 		// DeArrow API doesn't have a bulk requests endpoint :(
-		reqs = reqs.GET(`${URL_YOUTUBE_DEARROW_DATA}?videoID=${video.id.value}`, {});
+		reqs.GET(`${URL_YOUTUBE_DEARROW_DATA}?videoID=${video.id.value}`, {});
 	}
 
 	const resps = reqs.execute();
@@ -2341,14 +2357,14 @@ function deArrow_enhanceVideosWithAlternativeMetadata(videos) {
 			continue;
 		}
 
-		if (IS_TESTING || _settings["deArrowEnabledTitles"]) {
+		if (deArrow_isEnabledForTitles()) {
 			const bestTitle = deArrow_findBest(deArrowResp.titles);
 			if (bestTitle) {
 				video.alternativeName = bestTitle.title;
 			}
 		}
 
-		if (IS_TESTING || _settings["deArrowEnabledThumbnails"]) {
+		if (deArrow_isEnabledForThumbnails()) {
 			const bestThumbnail = deArrow_findBest(deArrowResp.thumbnails);
 			if (bestThumbnail) {
 				/*
