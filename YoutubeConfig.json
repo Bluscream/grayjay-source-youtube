@@ -4,7 +4,7 @@
 	"author": "FUTO + netux",
 	"authorUrl": "https://futo.org",
 	"platformUrl": "https://youtube.com",
-	"sourceUrl": "https://raw.githubusercontent.com/netux/grayjay-source-youtube/with-dearrow/YoutubeConfig.json",
+	"sourceUrl": "https://github.com/netux/grayjay-source-youtube/releases/latest/download/YoutubeConfig.json",
 	"repositoryUrl": "https://github.com/netux/grayjay-source-youtube/blob/with-dearrow",
 	"scriptUrl": "./YoutubeScript.js",
 	"version": 168,
