@@ -8,6 +8,7 @@
 	"repositoryUrl": "https://github.com/netux/grayjay-source-youtube/blob/with-dearrow",
 	"scriptUrl": "./YoutubeScript.js",
 	"version": 168,
+	"versionForkMinor": 1,
 	"iconUrl": "./youtube.png",
 	"id": "35ae969a-a7db-11ed-afa1-0242ac120002",
 
