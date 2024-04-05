@@ -2361,7 +2361,15 @@ function deArrow_fetchAlternativeMetadata(videoIds) {
 	}
 
 	const resps = reqs.execute();
-	const jsons = resps.map((resp) => JSON.parse(resp.body));
+	const jsons = resps.map((resp) => {
+		try {
+			return JSON.parse(resp.body);
+		} catch (error) {
+			console.error("Could not parse DeArrow response body as JSON:", error, { 'resp.body': resp.body });
+			return null;
+		}
+	});
+
 
 	return Object.fromEntries(jsons.map((deArrowResponse, index) => [videoIds[index], deArrowResponse]));
 }
