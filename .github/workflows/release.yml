@@ -16,7 +16,7 @@ jobs:
       - name: Sign
         shell: bash
         env:
-          SIGNING_PRIVATE_KEY: ${{ secrets.SIGNING_PRIVATE_KEY_BASE64_ENCODED }}
+          SIGNING_PRIVATE_KEY: ${{ secrets.SIGNING_PRIVATE_KEY_WITHOUT_HEADER_FOOTER }}
         run: |
           chmod +x ./sign.sh
           ./sign.sh ./YoutubeScript.js ./YoutubeConfig.json
