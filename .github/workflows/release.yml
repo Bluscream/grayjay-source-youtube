@@ -20,13 +20,13 @@ jobs:
         run: |
           chmod +x ./sign.sh
           ./sign.sh ./YoutubeScript.js ./YoutubeConfig.json
-      - name: Get upstream release version
-        id: get_upstream_release_version
+      - name: Get version major from tag
+        id: get_version_major_from_tag
         uses: actions/github-script@v7
         with:
           script: |
             const upstreamReleaseVersion = '${{ github.ref_name }}'.split('-')[0];
-            console.log('Upstream release version:', upstreamReleaseVersion);
+            console.log('Version major:', upstreamReleaseVersion);
             return upstreamReleaseVersion;
           result-encoding: string
       - name: Create draft release and upload plugin files
@@ -39,7 +39,7 @@ jobs:
 
             const release = await github.rest.repos.createRelease({
               ... context.repo,
-              name: 'YouTube with DeArrow (v${{ steps.get_upstream_release_version.outputs.result }})',
+              name: 'YouTube with DeArrow (v${{ steps.get_version_major_from_tag.outputs.result }})',
               draft: true,
               tag_name: '${{ github.ref_name }}',
               generate_release_notes: true
