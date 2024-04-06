@@ -23,3 +23,15 @@ Please note that there are two main branches:
 
 If you wish to do changes to the DeArrow functionality (new features, bug fixes), please target the `feature/dearrow` branch.
 If you wish to do cosmetic/dev-centric changes (change source's logo, update GitHub workflow), please target the `with-dearrow` branch.
+
+### Commit messages
+
+For both branches, we try to stick to [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/#summary):
+
+```txt
+<type>[optional scope]: <description>
+
+[optional body]
+```
+
+`type` can be: `feat`, `fix`, `chore`, `docs`, `test`, etc.
