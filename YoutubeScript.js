@@ -27,6 +27,8 @@ const URL_PLAYER = "https://youtubei.googleapis.com/youtubei/v1/player";
 
 const URL_YOUTUBE_DISLIKES = "https://returnyoutubedislikeapi.com/votes?videoId=";
 const URL_YOUTUBE_SPONSORBLOCK = "https://sponsor.ajay.app/api/skipSegments?videoID=";
+const URL_YOUTUBE_DEARROW_DATA = "https://sponsor.ajay.app/api/branding";
+const URL_YOUTUBE_DEARROW_THUMBNAIL = "https://dearrow-thumb.ajay.app/api/v1/getThumbnail";
 
 const URL_YOUTUBE_RSS = "https://www.youtube.com/feeds/videos.xml?channel_id=";
 
@@ -217,9 +219,10 @@ source.getHome = () => {
 	const tabs = extractPage_Tabs(initialData);
 	if(tabs.length == 0)
 		throw new ScriptException("No tabs found..");
-    if(tabs[0].videos.length > 0)
+    if(tabs[0].videos.length > 0) {
+			tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
 	    return new RichGridPager(tabs[0], {}, USE_MOBILE_PAGES, true);
-    else
+    } else
         return source.getTrending();
 };
 
@@ -230,6 +233,9 @@ source.getTrending = () => {
 	const tabs = extractPage_Tabs(initialData);
 	if(tabs.length == 0)
 		throw new ScriptException("No tabs found..");
+	if (tabs[0].videos.length > 0) {
+			tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
+	}
 	return new RichGridPager(tabs[0], {}, USE_MOBILE_PAGES, false);
 };
 
@@ -271,7 +277,11 @@ source.search = function(query, type, order, filters) {
 		console.log("Search Param:", param);
 
 	const data = requestSearch(query, false, param);
-	const searchResults = extractSearch_SearchResults(data);
+	let searchResults = extractSearch_SearchResults(data);
+
+	if (searchResults.videos?.length > 0) {
+			searchResults.videos = deArrow_enhanceVideosWithAlternativeMetadata(searchResults.videos);
+	}
 
 	if(searchResults.videos)
 		return new SearchItemSectionVideoPager(searchResults);
@@ -298,9 +308,13 @@ source.searchChannelContents = function(channelUrl, query, type, order, filters)
 
 	const tab = tabs.find(x=>x.title == "Search");
 
-	if(tab)
+	if(tab) {
+		if (tab.videos?.length > 0) {
+				tab.videos = deArrow_enhanceVideosWithAlternativeMetadata(tab.videos);
+		}
+		
 		return new RichGridPager(tab, {}, USE_MOBILE_PAGES, true);
-	else
+	} else
 		throw new ScriptException("No search tab found");
 }
 
@@ -401,7 +415,7 @@ source.getContentDetails = (url, useAuth) => {
 		console.log("Initial Player Data", initialPlayerData);
 	}
 
-	const videoDetails = extractVideoPage_VideoDetails(initialData, initialPlayerData, {
+	let videoDetails = extractVideoPage_VideoDetails(initialData, initialPlayerData, {
 		url: url
 	}, jsUrl);
 	if(videoDetails == null)
@@ -458,6 +472,8 @@ source.getContentDetails = (url, useAuth) => {
             console.log("Failed to fetch Youtube Dislikes", ex);
         }
 	}
+
+	[videoDetails] = deArrow_enhanceVideosWithAlternativeMetadata([videoDetails]);
 
 	const finalResult = videoDetails;
 	finalResult.__initialData = initialData;
@@ -981,6 +997,11 @@ source.getChannelContents = (url, type, order, filters) => {
 		}
 		return new VideoPager([], false);
 	}
+
+	if (tab.videos.length > 0) {
+		tab.videos = deArrow_enhanceVideosWithAlternativeMetadata(tab.videos);
+	}
+
 	//throw new ScriptException("Could not find tab: " + targetTab);
 
 	return new RichGridPager(tab, contextData);
@@ -1133,18 +1154,21 @@ source.getPlaylist = function (url) {
 			videos[0].thumbnails.sources.length > 0)
 			thumbnail = videos[0].thumbnails.sources[videos[0].thumbnails.sources.length - 1].url;
 
-		
-        return new PlatformPlaylistDetails({
-            url: url,
+		if (videos && videos.length > 0) {
+			deArrow_enhanceVideosWithAlternativeMetadata(videos);
+		}
+
+		return new PlatformPlaylistDetails({
+			url: url,
 			id: new PlatformID(PLATFORM, playlistHeaderRenderer?.playlistId, config.id),
 			author: extractRuns_AuthorLink(playlistHeaderRenderer?.ownerText?.runs),
-            name: title,
-            thumbnail: thumbnail,
-            videoCount: videos.length,
-            contents: new VideoPager(videos)
-        });
-    }
-    return null;
+			name: title,
+			thumbnail: thumbnail,
+			videoCount: videos.length,
+			contents: new VideoPager(videos)
+		});
+	}
+	return null;
 };
 source.getUserPlaylists = function() {
 	if (!bridge.isLoggedIn()) {
@@ -1696,6 +1720,10 @@ class RichGridPager extends VideoPager {
                         vids = vids.concat(shelf.videos);
 				    }
 				    newItemSection.videos = vids;
+				}
+
+				if (newItemSection.videos?.length > 0) {
+					newItemSection.videos = deArrow_enhanceVideosWithAlternativeMetadata(newItemSection.videos);
 				}
 
 				if(newItemSection.videos)
@@ -2279,6 +2307,131 @@ function extractSearch_SearchResults(data, contextData) {
 		return results;
 	}
 	return {};
+}
+
+/**
+ * @param {PlatformVideo[]} videos
+ */
+function deArrow_enhanceVideosWithAlternativeMetadata(videos) {
+	const isEnabledForTitles = IS_TESTING || _settings["deArrowEnabledTitles"];
+	const isEnabledForThumbnails = IS_TESTING || _settings["deArrowEnabledThumbnails"];
+
+	if (!isEnabledForTitles && !isEnabledForThumbnails) {
+		// DeArrow functionality disabled. Do not fetch alternative metadata.
+		return videos;
+	}
+
+	const unprocessedVideos = videos
+		.filter((video) => (
+			(isEnabledForTitles && !video.alternativeName) ||
+			(isEnabledForThumbnails && !video.thumbnails.sources.find(({ type }) => type === "alternative"))
+		));
+
+	const videoIdToDeArrowResponseMap = deArrow_fetchAlternativeMetadata(
+		unprocessedVideos.map((video) => video.id.value)
+	);
+
+	for (const video of unprocessedVideos) {
+		const deArrowResponse = videoIdToDeArrowResponseMap[video.id.value];
+
+		if (deArrowResponse == null) {
+			log(`Got a null response from DeArrow for video ${ video.id.value }. DeArrow servers might be down.`);
+			continue;
+		}
+
+		deArrow_applyAlternativeMetadata(video, { // modifies `video` in-place
+			titles: isEnabledForTitles ? deArrowResponse.titles : null,
+			thumbnails: isEnabledForThumbnails ? deArrowResponse.thumbnails : null,
+		});
+	}
+
+	return videos;
+}
+
+/**
+ * @param {string[]} videoIds
+ */
+function deArrow_fetchAlternativeMetadata(videoIds) {
+	const reqs = http.batch();
+	for (const videoId of videoIds) {
+		// TODO: find a way to speed this up
+		// DeArrow API doesn't have a bulk requests endpoint :(
+		reqs.GET(`${URL_YOUTUBE_DEARROW_DATA}?videoID=${videoId}`, {});
+	}
+
+	const resps = reqs.execute();
+	const jsons = resps.map((resp) => {
+		try {
+			return JSON.parse(resp.body);
+		} catch (error) {
+			console.error("Could not parse DeArrow response body as JSON:", error, { 'resp.body': resp.body });
+			return null;
+		}
+	});
+
+
+	return Object.fromEntries(jsons.map((deArrowResponse, index) => [videoIds[index], deArrowResponse]));
+}
+
+/**
+ * @param {PlatformVideo} video
+ * @param {Object} deArrowResponse
+ * @param {Object[] | null} deArrowResponse.titles
+ * @param {Object[] | null} deArrowResponse.thumbnails
+ */
+function deArrow_applyAlternativeMetadata(video, { titles = null, thumbnails = null }) {
+	if (titles) {
+		const bestTitle = deArrow_findBest(titles);
+		if (bestTitle) {
+			video.name = bestTitle.title;
+		}
+	}
+
+	if (thumbnails) {
+		const bestThumbnail = deArrow_findBest(thumbnails);
+		if (bestThumbnail) {
+			/*
+			* TODO: fetch thumbnail headers at least once, to know if DeArrow has them generated.
+			* From the DeArrow docs:
+			*   Response codes (PLEASE READ):
+			*   200: Ok
+			*   204: No content, failed to generate, or chose not to generate
+			*/
+			video.thumbnails.sources = [{
+				type: "alternative",
+				url: `${URL_YOUTUBE_DEARROW_THUMBNAIL}?videoID=${video.id.value}&time=${bestThumbnail.timestamp}`,
+				quality: 404
+			}]
+		}
+	}
+
+	return video;
+}
+
+/**
+ * Get the best possible object (title or thumbnail) from DeArrow:
+ * 1. If there is a locked object, return that one
+ * 2. Otherwise, return the most voted object - unless it has negative votes
+ * 3. Otherwise, return null
+ *
+ * See https://wiki.sponsor.ajay.app/w/API_Docs/DeArrow#GET_/api/branding
+ */
+function deArrow_findBest(objects) {
+    let mostVoted = null;
+
+    for (const object of objects) {
+        if (object.locked) {
+            return object;
+        } else if (object.original) {
+            continue;
+        }
+
+        if (object.votes >= 0 && (!mostVoted || object.votes > mostVoted.votes)) {
+            mostVoted = object;
+        }
+    }
+
+    return mostVoted;
 }
 
 /**
