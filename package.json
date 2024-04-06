@@ -6,8 +6,8 @@
   "main": "YoutubeScript.js",
   "scripts": {
     "build:all": "npm run build:standard && npm run build:uses-alternative-metadata",
-    "build:standard": "dotenv -v ROLLUP_BUILD_RELEASE=standard \"rollup --config config/rollup.config.mjs\"",
-    "build:uses-alternative-metadata": "dotenv -v ROLLUP_BUILD_RELEASE=uses-alternative-metadata \"rollup --config config/rollup.config.mjs\""
+    "build:standard": "cross-env ROLLUP_BUILD_RELEASE=standard rollup --config config/rollup.config.mjs",
+    "build:uses-alternative-metadata": "cross-env ROLLUP_BUILD_RELEASE=uses-alternative-metadata rollup --config config/rollup.config.mjs"
   },
   "engines": {
     "node": "^18"
@@ -31,7 +31,7 @@
   "homepage": "https://github.com/netux/grayjay-source-youtube#readme",
   "devDependencies": {
     "@rollup/plugin-replace": "^5.0.5",
-    "dotenv-cli": "^7.4.1",
+    "cross-env": "^7.0.3",
     "rollup": "^4.14.0",
     "rollup-plugin-copy": "^3.5.0"
   }
