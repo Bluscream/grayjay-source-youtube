@@ -13,7 +13,7 @@ const RELEASE = Object.freeze({
 const release = process.env.SOURCE_RELEASE_TYPE;
 const projectRootDir = path.resolve(fileURLToPath(new URL(import.meta.url)), '..');
 const packageJson = JSON.parse(fs.readFileSync(path.resolve(projectRootDir, 'package.json'), 'utf-8'));
-const packageVersion = packageJson.version.split('.', 3);
+const packageVersion = packageJson.version.split('.', 3).map((n) => parseInt(n, 10));
 
 export default {
 	"name": "Youtube with DeArrow",
@@ -26,7 +26,7 @@ export default {
 	"scriptUrl": `./YoutubeScript_${release}.js`,
 	"version": release === RELEASE.USES_ALTERNATIVE_METADATA
 		? packageVersion[0]
-		: `${packageVersion[0] * 100}${packageVersion[1]}`, // this should be plenty of patch versions, right?
+		: packageVersion[0] * 100 + packageVersion[1], // 100 should be plenty of patches, right?
 	"versionForkMinor": release === RELEASE.USES_ALTERNATIVE_METADATA
 		? packageVersion[1]
 		: undefined,
