@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from "node:url";
 
 const FUTO_YOUTUBE_SOURCE_ID = '35ae969a-a7db-11ed-afa1-0242ac120002';
 const FORK_YOUTUBE_SOURCE_ID = '35ae969a-a7db-11ed-afa1-00000d346603';
@@ -10,7 +11,7 @@ const RELEASE = Object.freeze({
 });
 
 const release = process.env.ROLLUP_BUILD_RELEASE;
-const projectRootDir = path.resolve(new URL(import.meta.url).pathname.substring(1), '..');
+const projectRootDir = path.resolve(fileURLToPath(new URL(import.meta.url)), '..');
 const packageJson = JSON.parse(fs.readFileSync(path.resolve(projectRootDir, 'package.json'), 'utf-8'));
 const packageVersion = packageJson.version.split('.', 3);
 
