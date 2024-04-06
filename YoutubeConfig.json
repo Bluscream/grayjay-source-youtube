@@ -119,7 +119,7 @@
 		{
 			"variable": "deArrowHeader",
 			"name": "DeArrow",
-			"description": "DeArrow replaces video titles and thumbnails with better ones, which are more accurate and less prone to sensationalism (Using https://dearrow.ajay.app)",
+			"description": "DeArrow replaces video titles and thumbnails with better ones, which are more accurate and less prone to sensationalism (Using https://dearrow.ajay.app)\nNote: makes search very slow!",
 			"type": "Header"
 		},
 		{

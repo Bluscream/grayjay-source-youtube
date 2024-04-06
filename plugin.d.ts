@@ -261,6 +261,8 @@ interface Map<T> {
 
 //To override by plugin
 
+declare const SET_ALTERNATIVE_METADATA: boolean;
+
 interface Source {
     getHome(): VideoPager;
 

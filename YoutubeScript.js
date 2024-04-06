@@ -222,9 +222,8 @@ source.getHome = () => {
     if(tabs[0].videos.length > 0) {
 			tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
 	    return new RichGridPager(tabs[0], {}, USE_MOBILE_PAGES, true);
-    } else {
+    } else
         return source.getTrending();
-    }
 };
 
 source.getTrending = () => {
@@ -234,9 +233,9 @@ source.getTrending = () => {
 	const tabs = extractPage_Tabs(initialData);
 	if(tabs.length == 0)
 		throw new ScriptException("No tabs found..");
-    if (tabs[0].videos.length > 0) {
-        tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
-    }
+	if (tabs[0].videos.length > 0) {
+			tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
+	}
 	return new RichGridPager(tabs[0], {}, USE_MOBILE_PAGES, false);
 };
 
@@ -278,11 +277,11 @@ source.search = function(query, type, order, filters) {
 		console.log("Search Param:", param);
 
 	const data = requestSearch(query, false, param);
-    let searchResults = extractSearch_SearchResults(data);
+	let searchResults = extractSearch_SearchResults(data);
 
-    if (searchResults.videos?.length > 0) {
-        searchResults.videos = deArrow_enhanceVideosWithAlternativeMetadata(searchResults.videos);
-    }
+	if (searchResults.videos?.length > 0) {
+			searchResults.videos = deArrow_enhanceVideosWithAlternativeMetadata(searchResults.videos);
+	}
 
 	if(searchResults.videos)
 		return new SearchItemSectionVideoPager(searchResults);
@@ -309,14 +308,14 @@ source.searchChannelContents = function(channelUrl, query, type, order, filters)
 
 	const tab = tabs.find(x=>x.title == "Search");
 
-    if(!tab)
-        throw new ScriptException("No search tab found");
-
-    if (tab.videos?.length > 0) {
-        tab.videos = deArrow_enhanceVideosWithAlternativeMetadata(tab.videos);
-    }
-
-    return new RichGridPager(tab, {}, USE_MOBILE_PAGES, true);
+	if(tab) {
+		if (tab.videos?.length > 0) {
+				tab.videos = deArrow_enhanceVideosWithAlternativeMetadata(tab.videos);
+		}
+		
+		return new RichGridPager(tab, {}, USE_MOBILE_PAGES, true);
+	} else
+		throw new ScriptException("No search tab found");
 }
 
 source.getChannelUrlByClaim = (claimType, claimValues) => {
@@ -2384,7 +2383,11 @@ function deArrow_applyAlternativeMetadata(video, { titles = null, thumbnails = n
 	if (titles) {
 		const bestTitle = deArrow_findBest(titles);
 		if (bestTitle) {
-			video.alternativeName = bestTitle.title;
+			if (SET_ALTERNATIVE_METADATA) {
+				video.alternativeName = bestTitle.title;
+			} else {
+				video.name = bestTitle.title;
+			}
 		}
 	}
 
@@ -2398,11 +2401,19 @@ function deArrow_applyAlternativeMetadata(video, { titles = null, thumbnails = n
 			*   200: Ok
 			*   204: No content, failed to generate, or chose not to generate
 			*/
-			video.thumbnails.sources.push({
-				type: "alternative",
-				url: `${URL_YOUTUBE_DEARROW_THUMBNAIL}?videoID=${video.id.value}&time=${bestThumbnail.timestamp}`,
-				quality: 404
-			})
+			if (SET_ALTERNATIVE_METADATA) {
+				video.thumbnails.sources.push({
+					type: "alternative",
+					url: `${URL_YOUTUBE_DEARROW_THUMBNAIL}?videoID=${video.id.value}&time=${bestThumbnail.timestamp}`,
+					quality: 404
+				})
+			} else {
+				video.thumbnails.sources = [{
+					type: "alternative",
+					url: `${URL_YOUTUBE_DEARROW_THUMBNAIL}?videoID=${video.id.value}&time=${bestThumbnail.timestamp}`,
+					quality: 404
+				}]
+			}
 		}
 	}
 
