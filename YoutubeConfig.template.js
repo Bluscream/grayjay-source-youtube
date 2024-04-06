@@ -10,7 +10,7 @@ const RELEASE = Object.freeze({
 	STANDARD: 'standard'
 });
 
-const release = process.env.ROLLUP_BUILD_RELEASE;
+const release = process.env.SOURCE_RELEASE_TYPE;
 const projectRootDir = path.resolve(fileURLToPath(new URL(import.meta.url)), '..');
 const packageJson = JSON.parse(fs.readFileSync(path.resolve(projectRootDir, 'package.json'), 'utf-8'));
 const packageVersion = packageJson.version.split('.', 3);

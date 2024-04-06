@@ -7,7 +7,7 @@ const RELEASE = Object.freeze({
 	STANDARD: 'standard'
 });
 
-const release = process.env.ROLLUP_BUILD_RELEASE;
+const release = process.env.SOURCE_RELEASE_TYPE;
 const outputDir = `dist/${release}`;
 
 if (!Object.values(RELEASE).some((value) => release === value)) {

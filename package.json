@@ -6,8 +6,8 @@
   "main": "YoutubeScript.js",
   "scripts": {
     "build:all": "npm run build:standard && npm run build:uses-alternative-metadata",
-    "build:standard": "cross-env ROLLUP_BUILD_RELEASE=standard rollup --config config/rollup.config.js",
-    "build:uses-alternative-metadata": "cross-env ROLLUP_BUILD_RELEASE=uses-alternative-metadata rollup --config config/rollup.config.js"
+    "build:standard": "cross-env SOURCE_RELEASE_TYPE=standard rollup --config config/rollup.config.js",
+    "build:uses-alternative-metadata": "cross-env SOURCE_RELEASE_TYPE=uses-alternative-metadata rollup --config config/rollup.config.js"
   },
   "engines": {
     "node": "^18"
