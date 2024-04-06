@@ -1,0 +1,36 @@
+{
+  "name": "grayjay-source-youtube-with-dearrow",
+  "version": "168.1.0",
+  "description": "One of the biggest video platforms owned by Google - now with DeArrow support",
+  "main": "YoutubeScript.js",
+  "scripts": {
+    "build:all": "npm run build:standard && npm run build:uses-alternative-metadata",
+    "build:standard": "dotenv -v ROLLUP_BUILD_RELEASE=standard \"rollup --config config/rollup.config.mjs\"",
+    "build:uses-alternative-metadata": "dotenv -v ROLLUP_BUILD_RELEASE=uses-alternative-metadata \"rollup --config config/rollup.config.mjs\""
+  },
+  "engines": {
+    "node": "^18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/netux/grayjay-source-youtube.git"
+  },
+  "keywords": [
+    "Grayjay",
+    "YouTube",
+    "DeArrow"
+  ],
+  "contributors": [
+    "FUTO",
+    "netux"
+  ],
+  "bugs": {
+    "url": "https://github.com/netux/grayjay-source-youtube/issues"
+  },
+  "homepage": "https://github.com/netux/grayjay-source-youtube#readme",
+  "devDependencies": {
+    "@rollup/plugin-replace": "^5.0.5",
+    "dotenv-cli": "^7.4.1",
+    "rollup": "^4.14.0"
+  }
+}
