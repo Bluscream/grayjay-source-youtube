@@ -6,20 +6,44 @@ on:
       - '*'
 
 jobs:
-  sign_and_release:
+  build_and_sign:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # needed to create GitHub Release
     steps:
       - name: Checkout Git repository
         uses: actions/checkout@v4
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+      - name: Build with NPM
+        run: |-
+          npm install
+          npm run build:all
       - name: Sign
         shell: bash
         env:
           SIGNING_PRIVATE_KEY: ${{ secrets.SIGNING_PRIVATE_KEY_WITHOUT_HEADER_FOOTER }}
         run: |
           chmod +x ./sign.sh
-          ./sign.sh ./YoutubeScript.js ./YoutubeConfig.json
+          ./sign.sh ./dist/standard/YoutubeScript.js ./dist/standard/YoutubeConfig.json
+          ./sign.sh ./dist/uses-alternative-metadata/YoutubeScript.js ./dist/uses-alternative-metadata/YoutubeConfig.json
+      - name: Archive output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+  release:
+    runs-on: ubuntu-latest
+    needs: [ build_and_sign ]
+    permissions:
+      contents: write # needed to create GitHub Release
+    steps:
+      - name: Download output artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
       - name: Get version major from tag
         id: get_version_major_from_tag
         uses: actions/github-script@v7
@@ -47,16 +71,22 @@ jobs:
 
             console.log('Draft release created:', release.data.html_url);
 
-            for (const fileName of ['YoutubeConfig.json', 'YoutubeScript.js']) {
-              console.log(`Uploading ${fileName} asset to draft release`);
+            for (const releaseType of ['standard', 'uses-alternative-metadata']) {
+              for (const fileName of ['YoutubeConfig.json', 'YoutubeScript.js']) {
+                const assetFileName = fileName.split('.')
+                  .map((part, index) => index === 0 ? `${part}_${releaseType}` : part)
+                  .join('.');
 
-              const data = await fs.readFile(fileName);
-              await github.rest.repos.uploadReleaseAsset({
-                ... context.repo,
-                release_id: release.data.id,
-                name: fileName,
-                data
-              });
+                console.log(`[${releaseType}] Uploading ${fileName} asset as ${assetFileName} to draft release`);
 
-              console.log(`${fileName} asset uploaded to draft release`);
+                const data = await fs.readFile(`dist/${releaseType}/${fileName}`);
+                await github.rest.repos.uploadReleaseAsset({
+                  ... context.repo,
+                  release_id: release.data.id,
+                  name: assetFileName,
+                  data
+                });
+
+                console.log(`[${releaseType}] ${assetFileName} uploaded to draft release`);
+              }
             }
