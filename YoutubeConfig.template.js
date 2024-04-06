@@ -1,16 +1,38 @@
-{
+import fs from 'node:fs';
+import path from 'node:path';
+
+const FUTO_YOUTUBE_SOURCE_ID = '35ae969a-a7db-11ed-afa1-0242ac120002';
+const FORK_YOUTUBE_SOURCE_ID = '35ae969a-a7db-11ed-afa1-00000d346603';
+
+const RELEASE = Object.freeze({
+	USES_ALTERNATIVE_METADATA: 'uses-alternative-metadata',
+	STANDARD: 'standard'
+});
+
+const release = process.env.ROLLUP_BUILD_RELEASE;
+const projectRootDir = path.resolve(new URL(import.meta.url).pathname.substring(1), '..');
+const packageJson = JSON.parse(fs.readFileSync(path.resolve(projectRootDir, 'package.json'), 'utf-8'));
+const packageVersion = packageJson.version.split('.', 3);
+
+export default {
 	"name": "Youtube with DeArrow",
 	"description": "One of the biggest video platforms owned by Google - now with DeArrow support",
-	"author": "FUTO + netux",
+	"author": "FUTO, netux",
 	"authorUrl": "https://futo.org",
 	"platformUrl": "https://youtube.com",
-	"sourceUrl": "https://github.com/netux/grayjay-source-youtube/releases/latest/download/YoutubeConfig.json",
+	"sourceUrl": `https://github.com/netux/grayjay-source-youtube/releases/latest/download/YoutubeConfig_${release}.json`,
 	"repositoryUrl": "https://github.com/netux/grayjay-source-youtube/blob/with-dearrow",
-	"scriptUrl": "./YoutubeScript.js",
-	"version": 168,
-	"versionForkMinor": 1,
-	"iconUrl": "./youtube.png",
-	"id": "35ae969a-a7db-11ed-afa1-0242ac120002",
+	"scriptUrl": `./YoutubeScript_${release}.js`,
+	"version": release === RELEASE.USES_ALTERNATIVE_METADATA
+		? packageVersion[0]
+		: `${packageVersion[0] * 100}${packageVersion[1]}`, // this should be plenty of patch versions, right?
+	"versionForkMinor": release === RELEASE.USES_ALTERNATIVE_METADATA
+		? packageVersion[1]
+		: undefined,
+	"iconUrl": "https://raw.githubusercontent.com/netux/grayjay-source-youtube/with-dearrow/youtube.png",
+	"id": release === RELEASE.USES_ALTERNATIVE_METADATA
+		? FUTO_YOUTUBE_SOURCE_ID
+		: FORK_YOUTUBE_SOURCE_ID,
 
 	"scriptSignature": "",
 	"scriptPublicKey": "",
@@ -159,4 +181,4 @@
 
 	"supportedClaimTypes": [2],
 	"primaryClaimFieldType": 1
-}
+};

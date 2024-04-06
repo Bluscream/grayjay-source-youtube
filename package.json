@@ -2,6 +2,7 @@
   "name": "grayjay-source-youtube-with-dearrow",
   "version": "168.1.0",
   "description": "One of the biggest video platforms owned by Google - now with DeArrow support",
+  "type": "module",
   "main": "YoutubeScript.js",
   "scripts": {
     "build:all": "npm run build:standard && npm run build:uses-alternative-metadata",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@rollup/plugin-replace": "^5.0.5",
     "dotenv-cli": "^7.4.1",
-    "rollup": "^4.14.0"
+    "rollup": "^4.14.0",
+    "rollup-plugin-copy": "^3.5.0"
   }
 }
