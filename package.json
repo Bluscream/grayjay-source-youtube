@@ -5,9 +5,15 @@
   "type": "module",
   "main": "YoutubeScript.js",
   "scripts": {
-    "build:all": "npm run build:standard && npm run build:uses-alternative-metadata",
     "build:standard": "cross-env SOURCE_RELEASE_TYPE=standard rollup --config config/rollup.config.js",
-    "build:uses-alternative-metadata": "cross-env SOURCE_RELEASE_TYPE=uses-alternative-metadata rollup --config config/rollup.config.js"
+    "build:uses-alternative-metadata": "cross-env SOURCE_RELEASE_TYPE=uses-alternative-metadata rollup --config config/rollup.config.js",
+    "build:all": "npm run build:standard && npm run build:uses-alternative-metadata",
+
+    "watch:standard": "npm run build:standard -- --watch",
+    "watch:uses-alternative-metadata": "npm run build:uses-alternative-metadata -- --watch",
+
+    "start:standard": "concurrently --names \"build,server\" \"npm run watch:standard\" \"http-server ./dist/standard --cache=-1 --port=11338\"",
+    "start:uses-alternative-metadata": "concurrently --names \"build,server\" \"npm run watch:uses-alternative-metadata\" \"http-server ./dist/uses-alternative-metadata --cache=-1 --port=11338\""
   },
   "engines": {
     "node": "^18"
@@ -31,7 +37,9 @@
   "homepage": "https://github.com/netux/grayjay-source-youtube#readme",
   "devDependencies": {
     "@rollup/plugin-replace": "^5.0.5",
+    "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
+    "http-server": "^14.1.1",
     "rollup": "^4.14.0",
     "rollup-plugin-copy": "^3.5.0"
   }
