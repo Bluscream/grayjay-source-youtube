@@ -8,7 +8,7 @@ const RELEASE = Object.freeze({
 	USES_ALTERNATIVE_METADATA: 'uses-alternative-metadata'
 });
 
-const thisFileFolderPath = path.resolve(fileURLToPath(new URL(import.meta.url)), '..');
+const projectRootDir = path.resolve(fileURLToPath(new URL(import.meta.url)), '../../');
 const releaseType = process.env.SOURCE_RELEASE_TYPE;
 const outputDir = `dist/${releaseType}`;
 
@@ -23,8 +23,8 @@ if (!Object.values(RELEASE).some((value) => releaseType === value)) {
  * @param {string} options.jsonOutputFilePath
  */
 function generateJSONFileFromTemplate(options) {
-	const srcTemplateFilePath = path.resolve(thisFileFolderPath, options.srcTemplateFilePath);
-	const jsonOutputFilePath = path.resolve(thisFileFolderPath, options.jsonOutputFilePath);
+	const srcTemplateFilePath = path.resolve(projectRootDir, options.srcTemplateFilePath);
+	const jsonOutputFilePath = path.resolve(projectRootDir, options.jsonOutputFilePath);
 
 	return {
 		name: 'generate-json-file-from-template',
@@ -58,7 +58,7 @@ export default {
 			}
 		}),
 		generateJSONFileFromTemplate({
-			srcTemplateFilePath: '../YoutubeConfig.template.js',
+			srcTemplateFilePath: 'YoutubeConfig.template.js',
 			jsonOutputFilePath: `${outputDir}/YoutubeConfig_${releaseType}.json`
 		})
 	]
