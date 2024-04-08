@@ -74,21 +74,17 @@ jobs:
             console.log('Draft release created:', release.data.html_url);
 
             for (const releaseType of ['standard', 'uses-alternative-metadata']) {
-              for (const fileName of ['YoutubeConfig.json', 'YoutubeScript.js']) {
-                const assetFileName = fileName.split('.')
-                  .map((part, index) => index === 0 ? `${part}_${releaseType}` : part)
-                  .join('.');
-
-                console.log(`[${releaseType}] Uploading ${fileName} asset as ${assetFileName} to draft release`);
+              for (const fileName of [`YoutubeConfig_${releaseType}.json`, `YoutubeScript_${releaseType}.js`]) {
+                console.log(`[${releaseType}] Uploading ${fileName} asset to draft release`);
 
                 const data = await fs.readFile(`dist/${releaseType}/${fileName}`);
                 await github.rest.repos.uploadReleaseAsset({
                   ... context.repo,
                   release_id: release.data.id,
-                  name: assetFileName,
+                  name: fileName,
                   data
                 });
 
-                console.log(`[${releaseType}] ${assetFileName} uploaded to draft release`);
+                console.log(`[${releaseType}] ${fileName} uploaded to draft release`);
               }
             }

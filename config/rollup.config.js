@@ -3,15 +3,15 @@ import path from 'node:path';
 import replace from '@rollup/plugin-replace';
 
 const RELEASE = Object.freeze({
-	USES_ALTERNATIVE_METADATA: 'uses-alternative-metadata',
-	STANDARD: 'standard'
+	STANDARD: 'standard',
+	USES_ALTERNATIVE_METADATA: 'uses-alternative-metadata'
 });
 
-const release = process.env.SOURCE_RELEASE_TYPE;
-const outputDir = `dist/${release}`;
+const releaseType = process.env.SOURCE_RELEASE_TYPE;
+const outputDir = `dist/${releaseType}`;
 
-if (!Object.values(RELEASE).some((value) => release === value)) {
-	throw new Error(`Unknown release '${release}'`);
+if (!Object.values(RELEASE).some((value) => releaseType === value)) {
+	throw new Error(`Unknown release '${releaseType}'`);
 }
 
 /**
@@ -38,7 +38,8 @@ function generateJSONFileFromTemplate(options) {
 export default {
 	input: 'YoutubeScript.js',
 	output: {
-		dir: outputDir
+		dir: outputDir,
+		entryFileNames: `[name]_${release}.js`
 	},
 	plugins: [
 		replace({
@@ -49,7 +50,7 @@ export default {
 		}),
 		generateJSONFileFromTemplate({
 			srcTemplateFilePath: '../YoutubeConfig.template.js',
-			jsonOutputFilePath: `${outputDir}/YoutubeConfig.json`
+			jsonOutputFilePath: `${outputDir}/YoutubeConfig_${release}.json`
 		})
 	]
 };
