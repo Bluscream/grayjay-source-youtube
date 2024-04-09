@@ -48,6 +48,10 @@ Fork of <https://gitlab.futo.org/videostreaming/plugins/youtube> with DeArrow su
   </tr>
 </table>
 
+## QR Code
+
+See [Versions](#versions) above.
+
 ## Known Issues
 
 - Due to the way the Grayjay plugin API works, and limitations with the DeArrow API, this source will significantly slow down the time it takes to load videos. The subscriptions feed will take the biggest hit, with up to 30 API requests per channel subscribed.
