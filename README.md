@@ -15,7 +15,7 @@ Fork of <https://gitlab.futo.org/videostreaming/plugins/youtube> with DeArrow su
   <tr>
     <td align="center">Standard</td>
     <td>
-      <ul>
+      <ul style="list-style: none; padding-left: 0;">
         <li>✔ Replaces titles and thumbnails with crowdsourced ones from DeArrow</li>
         <li>✔ Works with FUTO's original Grayjay app</li>
         <li>❌ Cannot individually toggle DeArrow metadata per-video</li>
@@ -28,7 +28,7 @@ Fork of <https://gitlab.futo.org/videostreaming/plugins/youtube> with DeArrow su
   <tr>
     <td align="center">Uses alternative metadata</td>
     <td>
-      <ul>
+      <ul style="list-style: none; padding-left: 0;">
         <li>✔ Adds alternative titles and thumbnails from DeArrow</li>
         <li>✔ Can individually toggle alternative metadata per-video
           <img alt="GIF showcasing how to toggle alternative metadata in the app" src="alternative-metadata-toggle.gif" />
