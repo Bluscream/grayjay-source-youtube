@@ -22,7 +22,10 @@ Fork of <https://gitlab.futo.org/videostreaming/plugins/youtube> with DeArrow su
       <ul>
     </td>
     <td>
-      <img alt="Scan to add source: standard release" src="qr_standard.png" />
+      <details>
+        <summary>Click to show/hide</summary>
+        <img alt="Scan to add source: standard release" src="qr_standard.png" />
+      </details>
     </td>
   </tr>
   <tr>
@@ -37,7 +40,10 @@ Fork of <https://gitlab.futo.org/videostreaming/plugins/youtube> with DeArrow su
       <ul>
     </td>
     <td>
-      <img alt="Scan to add source: uses-alternative-metadata release" src="qr_uses-alternative-metadata.png" />
+      <details>
+        <summary>Click to show/hide</summary>
+        <img alt="Scan to add source: uses-alternative-metadata release" src="qr_uses-alternative-metadata.png" />
+      </details>
     </td>
   </tr>
 </table>
