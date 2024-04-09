@@ -68,7 +68,8 @@ Please note that there are two main branches:
   - It is the branch from which releases are based off.
 
 If you wish to do changes to the DeArrow functionality for the `standard` release (new features, bug fixes), please target the `feature/dearrow` branch.
-If you wish to do changes to the DeArrow functionality for the `uses-alternative-metadata` release, or cosmetic/dev-centric changes (change source's logo, update GitHub workflow), please target the `with-dearrow` branch.
+<br />
+If you wish to do changes to the DeArrow functionality for the `uses-alternative-metadata` release, or do cosmetic/dev-centric changes (change source's logo, update GitHub workflow), please target the `with-dearrow` branch.
 
 ### Commit messages
 
