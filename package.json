@@ -1,6 +1,6 @@
 {
   "name": "grayjay-source-youtube-with-dearrow",
-  "version": "168.1.0",
+  "version": "168.2.0",
   "description": "One of the biggest video platforms owned by Google - now with DeArrow support",
   "type": "module",
   "main": "YoutubeScript.js",
