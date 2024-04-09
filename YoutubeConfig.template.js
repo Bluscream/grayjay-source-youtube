@@ -6,8 +6,8 @@ const FUTO_YOUTUBE_SOURCE_ID = '35ae969a-a7db-11ed-afa1-0242ac120002';
 const FORK_YOUTUBE_SOURCE_ID = '35ae969a-a7db-11ed-afa1-00000d346603';
 
 const RELEASE = Object.freeze({
-	USES_ALTERNATIVE_METADATA: 'uses-alternative-metadata',
-	STANDARD: 'standard'
+	STANDARD: 'standard',
+	USES_ALTERNATIVE_METADATA: 'uses-alternative-metadata'
 });
 
 const release = process.env.SOURCE_RELEASE_TYPE;
@@ -30,7 +30,7 @@ export default {
 	"versionForkMinor": release === RELEASE.USES_ALTERNATIVE_METADATA
 		? packageVersion[1]
 		: undefined,
-	"iconUrl": "https://raw.githubusercontent.com/netux/grayjay-source-youtube/with-dearrow/youtube.png",
+	"iconUrl": "https://raw.githubusercontent.com/netux/grayjay-source-youtube/with-dearrow/youtube_dearrow.png",
 	"id": release === RELEASE.USES_ALTERNATIVE_METADATA
 		? FUTO_YOUTUBE_SOURCE_ID
 		: FORK_YOUTUBE_SOURCE_ID,
