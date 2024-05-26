@@ -12,6 +12,7 @@ const URL_SEARCH = "https://www.youtube.com/youtubei/v1/search";
 const URL_BROWSE = "https://www.youtube.com/youtubei/v1/browse";
 const URL_BROWSE_MOBILE = "https://m.youtube.com/youtubei/v1/browse";
 const URL_NEXT = "https://www.youtube.com/youtubei/v1/next";
+const URL_NEXT_MOBILE = "https://m.youtube.com/youtubei/v1/next";
 const URL_GUIDE = "https://www.youtube.com/youtubei/v1/guide";
 const URL_SUB_CHANNELS_M = "https://m.youtube.com/feed/channels";
 const URL_SUBSCRIPTIONS_M = "https://m.youtube.com/feed/subscriptions";
@@ -33,7 +34,7 @@ const URL_YOUTUBE_DEARROW_THUMBNAIL = "https://dearrow-thumb.ajay.app/api/v1/get
 const URL_YOUTUBE_RSS = "https://www.youtube.com/feeds/videos.xml?channel_id=";
 
 //Newest to oldest
-const CIPHER_TEST_HASHES = ["4eae42b1", "f98908d1", "0e6aaa83", "d0936ad4", "8e83803a", "30857836", "4cc5d082", "f2f137c6", "1dda5629", "23604418", "71547d26", "b7910ca8"];
+const CIPHER_TEST_HASHES = ["a960a0cb", "178de1f2", "4eae42b1", "f98908d1", "0e6aaa83", "d0936ad4", "8e83803a", "30857836", "4cc5d082", "f2f137c6", "1dda5629", "23604418", "71547d26", "b7910ca8"];
 const CIPHER_TEST_PREFIX = "/s/player/";
 const CIPHER_TEST_SUFFIX = "/player_ias.vflset/en_US/base.js";
 
@@ -217,7 +218,8 @@ source.getHome = () => {
 	else
 		initialData = requestInitialData(URL_HOME, USE_MOBILE_PAGES, true);
 	const tabs = extractPage_Tabs(initialData);
-	if(tabs.length == 0)
+	if(tabs.length == 0) {
+        if(bridge.devSubmit) bridge.devSubmit("getHome - No tabs found..", JSON.stringify(initialData));
 		throw new ScriptException("No tabs found..");
     if(tabs[0].videos.length > 0) {
 			tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
@@ -231,8 +233,10 @@ source.getTrending = () => {
     if(IS_TESTING)
         console.log("getTrending initialData", initialData);
 	const tabs = extractPage_Tabs(initialData);
-	if(tabs.length == 0)
+	if(tabs.length == 0) {
+        if(bridge.devSubmit) bridge.devSubmit("getTrending - No tabs found..", JSON.stringify(initialData));
 		throw new ScriptException("No tabs found..");
+	}
 	if (tabs[0].videos.length > 0) {
 			tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
 	}
@@ -312,10 +316,12 @@ source.searchChannelContents = function(channelUrl, query, type, order, filters)
 		if (tab.videos?.length > 0) {
 				tab.videos = deArrow_enhanceVideosWithAlternativeMetadata(tab.videos);
 		}
-		
+
 		return new RichGridPager(tab, {}, USE_MOBILE_PAGES, true);
-	} else
+	} else {
+        if(bridge.devSubmit) bridge.devSubmit("searchChannelContents - No search tab found", JSON.stringify(initialData));
 		throw new ScriptException("No search tab found");
+	}
 }
 
 source.getChannelUrlByClaim = (claimType, claimValues) => {
@@ -361,14 +367,15 @@ source.getContentDetails = (url, useAuth) => {
 	headersUsed["Cookie"] = "PREF=hl=en&gl=US"
 
 	const batch = http.batch().GET(url, headersUsed, useLogin);
-		
+
 	if(videoId && _settings["youtubeDislikes"])
 		batch.GET(URL_YOUTUBE_DISLIKES + videoId, {}, false);
 	const resps = batch.execute();
 
     throwIfCaptcha(resps[0]);
-	if(!resps[0].isOk)
+	if(!resps[0].isOk) {
 		throw new ScriptException("Failed to request page [" + resps[0].code + "]");
+	}
 
 	const html = resps[0].body;//requestPage(url);
 	const initialData = getInitialData(html);
@@ -376,11 +383,11 @@ source.getContentDetails = (url, useAuth) => {
 
     if(initialPlayerData?.playabilityStatus?.status == "UNPLAYABLE")
 		throw new UnavailableException("Video unplayable");
-	
+
 	const jsUrlMatch = html.match("PLAYER_JS_URL\"\\s?:\\s?\"(.*?)\"");
 	const jsUrl = (jsUrlMatch) ? jsUrlMatch[1] : clientContext.PLAYER_JS_URL;
 	const isNewCipher = prepareCipher(jsUrl);
-	
+
 	const ageRestricted = initialPlayerData.playabilityStatus?.reason?.indexOf("your age") > 0 ?? false;
 	if (ageRestricted) {
 		if (_settings["allowAgeRestricted"]) {
@@ -405,11 +412,11 @@ source.getContentDetails = (url, useAuth) => {
 			throw new UnavailableException("Controversial restricted videos can be allowed using the plugin settings");
 		}
 	}
-	
+
 	if (initialPlayerData.playabilityStatus?.status == "LOGIN_REQUIRED") {
 		throw new ScriptException("Login required\nReason: " + initialPlayerData?.playabilityStatus?.reason);
 	}
-		
+
 	if(IS_TESTING) {
 		console.log("Initial Data", initialData);
 		console.log("Initial Player Data", initialPlayerData);
@@ -417,11 +424,11 @@ source.getContentDetails = (url, useAuth) => {
 
 	let videoDetails = extractVideoPage_VideoDetails(initialData, initialPlayerData, {
 		url: url
-	}, jsUrl);
+	}, jsUrl, useLogin);
 	if(videoDetails == null)
 	    throw new UnavailableException("No video found");
 
-	if(!videoDetails.live && 
+	if(!videoDetails.live &&
 		(videoDetails.video?.videoSources == null || videoDetails.video.videoSources.length == 0) &&
 		(!videoDetails.datetime || videoDetails.datetime < (((new Date()).getTime() / 1000) - 60 * 60))) {
         if(isNewCipher) {
@@ -540,8 +547,20 @@ source.getContentChapters = function(url, initialData) {
 		const reqs = http.batch()
 		    .GET(url, getRequestHeaders({}), false);
 
-        if(_settings["sponsorBlock"] && videoId)
-            reqs.GET(URL_YOUTUBE_SPONSORBLOCK + videoId, {}, false);
+        if(_settings["sponsorBlock"] && videoId) {
+			const cats = [
+				(!!_settings["sponsorBlockCat_Sponsor"]) ? "sponsor" : null,
+				(!!_settings["sponsorBlockCat_Intro"]) ? "intro" : null,
+				(!!_settings["sponsorBlockCat_Outro"]) ? "outro" : null,
+				(!!_settings["sponsorBlockCat_Self"]) ? "selfpromo" : null,
+				(!!_settings["sponsorBlockCat_Offtopic"]) ? "music_offtopic" : null,
+				(!!_settings["sponsorBlockCat_Preview"]) ? "preview" : null,
+				(!!_settings["sponsorBlockCat_Filler"]) ? "filler" : null
+			].filter(x=>!!x);
+			const catsArg = "&categories=[" + cats.map(x=>"\"" + x + "\"").join(",") + "]";
+            reqs.GET(URL_YOUTUBE_SPONSORBLOCK + videoId + catsArg, {}, false);
+
+		}
 
         const resps = reqs.execute();
 
@@ -785,7 +804,7 @@ class YoutubePlaybackTracker extends PlaybackTracker {
 		this.idpj = -Math.floor(10 * Math.random());
 		this.ldpj = -Math.floor(40 * Math.random());
 		this.lastPosition = 0;
-		
+
 		this.watchUrl = playerData.playbackTracking?.videostatsWatchtimeUrl?.baseUrl;
 		this.playbackUrl = playerData.playbackTracking?.videostatsPlaybackUrl?.baseUrl;
 		if(!this.playbackUrl || !this.watchUrl)
@@ -795,7 +814,7 @@ class YoutubePlaybackTracker extends PlaybackTracker {
 		this.watchUrlBase = this.watchUrl.substring(0, this.watchUrl.indexOf("?"));
 		this.watchParams = parseQueryString(this.watchUrl);
 		this.playbackParams = parseQueryString(this.playbackUrl);
-		
+
 		delete this.playbackParams["fexp"];
 	    delete this.watchParams["fexp"];
 
@@ -903,21 +922,28 @@ function constructUrl(base, queryParams) {
 
 source.getComments = (url) => {
     url = convertIfOtherUrl(url);
+	const useLogin = (!!_settings?.authDetails) && bridge.isLoggedIn();
+	if(useLogin)
+		log("USING AUTH FOR COMMENTS");
+	if(useLogin && url.indexOf("/www.") >= 0)
+		url = url.replace("www", "m");
 
-	const html = requestPage(url);
-	const initialData = getInitialData(html);
+	//const html = requestPage(url, {}, useLogin);
+	const initialData = requestInitialData(url, useLogin, useLogin);
 	const contents = initialData.contents;
 	const result = contents.twoColumnWatchNextResults?.results?.results?.contents ??
+		contents.singleColumnWatchNextResults?.results?.results?.contents ??
 		null;	//Add any alternative containers
 	if(!result)
 		return new CommentPager([], false);
-	return extractTwoColumnWatchNextResultContents_CommentsPager(url, result);
+	const engagementPanels = initialData.engagementPanels ?? [];
+	return extractTwoColumnWatchNextResultContents_CommentsPager(url, result, useLogin, engagementPanels);
 };
 source.getSubComments = (comment) => {
 	if(typeof comment === 'string')
 		comment = JSON.parse(comment);
 	if(comment.context?.replyContinuation) {
-		return requestCommentPager(comment.contextUrl, comment.context.replyContinuation);
+		return requestCommentPager(comment.contextUrl, comment.context.replyContinuation, comment?.context?.useLogin == 'true', comment?.context?.useMobile == 'true');
 	}
 	else
 		return new CommentPager([], false);
@@ -927,8 +953,8 @@ source.getSubComments = (comment) => {
 
 //Channel
 source.isChannelUrl = (url) => {
-	return REGEX_VIDEO_CHANNEL_URL.test(url) || 
-		REGEX_VIDEO_CHANNEL_URL2.test(url) || 
+	return REGEX_VIDEO_CHANNEL_URL.test(url) ||
+		REGEX_VIDEO_CHANNEL_URL2.test(url) ||
 		REGEX_VIDEO_CHANNEL_URL3.test(url)
 };
 source.getChannel = (url) => {
@@ -971,7 +997,7 @@ source.getChannelContents = (url, type, order, filters) => {
 	if(useAuth)
 		log("USING AUTH FOR CHANNEL");
 
-	const initialData = requestInitialData(url, false, useAuth);
+	const initialData = requestInitialData(url, useAuth, useAuth);
 	if(!initialData)
 	    throw new ScriptException("No channel data found for: " + url);
 	const channel = extractChannel_PlatformChannel(initialData, url);
@@ -979,9 +1005,9 @@ source.getChannelContents = (url, type, order, filters) => {
 		authorLink: new PlatformAuthorLink(new PlatformID(PLATFORM, channel.id.value, config.id, PLATFORM_CLAIMTYPE), channel.name, channel.url, channel.thumbnail)
 	};
 	const tabs = extractPage_Tabs(initialData, contextData);
-	
+
 	const tab = tabs.find(x=>x.title == targetTab);
-	if(!tab) 
+	if(!tab)
 		return new VideoPager([], false);
 	if(IS_TESTING)
 		console.log("Tab", tab);
@@ -1004,10 +1030,16 @@ source.getChannelContents = (url, type, order, filters) => {
 
 	//throw new ScriptException("Could not find tab: " + targetTab);
 
-	return new RichGridPager(tab, contextData);
+	return new RichGridPager(tab, contextData, useAuth, useAuth);
 };
-/*
-source.peekChannelContents = function(url) {
+
+source.getPeekChannelTypes = () => {
+	return [Type.Feed.Videos, Type.Feed.Mixed];
+}
+source.peekChannelContents = function(url, type) {
+    if(type != Type.Feed.Mixed && type != Type.Feed.Videos)
+        return [];
+
     const match = url.match(REGEX_VIDEO_CHANNEL_URL);
     if(!match || match.length != 3)
         return {};
@@ -1016,7 +1048,7 @@ source.peekChannelContents = function(url) {
         return {};
     const rssUrl = URL_YOUTUBE_RSS + id;
 
-    const xmlResp = http.GET(rssUrl);
+    const xmlResp = http.GET(rssUrl, {});
 
     if(!xmlResp.isOk)
         return null;
@@ -1056,10 +1088,8 @@ source.peekChannelContents = function(url) {
 		}));
     }
 
-    const result = {};
-    result[Type.Feed.Mixed] = videos;
-    return result;
-}; */
+    return videos;
+};
 
 source.searchPlaylists = function(query, type, order, filters) {
     const data = requestSearch(query, false, SEARCH_PLAYLISTS_PARAM);
@@ -1105,7 +1135,7 @@ source.getPlaylist = function (url) {
             log("playlistVideoListRenderer not found");
             return null;
 		}
-		
+
         const id = playlistHeaderRenderer.playlistId;
 		const title = extractText_String(playlistHeaderRenderer.title);
 		const videos = [];
@@ -1149,8 +1179,8 @@ source.getPlaylist = function (url) {
 		}
 
 		let thumbnail = null;
-		if(videos && videos.length > 0 && 
-			videos[0].thumbnails?.sources && 
+		if(videos && videos.length > 0 &&
+			videos[0].thumbnails?.sources &&
 			videos[0].thumbnails.sources.length > 0)
 			thumbnail = videos[0].thumbnails.sources[videos[0].thumbnails.sources.length - 1].url;
 
@@ -1251,7 +1281,7 @@ source.getUserSubscriptions = function() {
 		bridge.log("Failed to retrieve subscriptions page because not logged in.");
 		throw new ScriptException("Not logged in");
 	}
-	
+
 	let subsPage = requestPage(URL_SUB_CHANNELS_M, { "User-Agent": USER_AGENT_PHONE }, true);
 	let result = getInitialData(subsPage);
 
@@ -1302,7 +1332,7 @@ source.getUserSubscriptions = function() {
 									if(author)
 										subs.push(author);
 								},
-								default(name) { 
+								default(name) {
 									log("Unknown menu item renderer: " + name);
 								}
 							});
@@ -1435,7 +1465,7 @@ class YTRequestModifier extends RequestModifier {
 			headers["Sec-Fetch-Mode"] = "cors";
 			headers["Sec-Fetch-Site"] = "cross-site";
 		}
-	
+
 		headers['TE'] = "trailers";
 
 		if (c) {
@@ -1469,7 +1499,7 @@ class YTLiveEventPager extends LiveEventPager {
 		this.nextPage();
 	}
 	nextPage() {
-		const newResult = http.POST(URL_LIVE_CHAT + "?key=" + this.key + "&prettyPrint=false", 
+		const newResult = http.POST(URL_LIVE_CHAT + "?key=" + this.key + "&prettyPrint=false",
 		JSON.stringify({
 			context: {
 				client: {
@@ -1497,7 +1527,7 @@ class YTLiveEventPager extends LiveEventPager {
 		const json = JSON.parse(newResult.body);
 		//if(IS_TESTING)
 		//	console.log("Live Chat Json:", json);
-	
+
 		const continuationArr = json?.continuationContents?.liveChatContinuation?.continuations;
 		if(!continuationArr || continuationArr.length == 0) {
 			this.hasMore = false;
@@ -1509,7 +1539,7 @@ class YTLiveEventPager extends LiveEventPager {
 			throw new ScriptException("No chat continuation found");
 		}
 		this.continuation = continuation;
-	
+
 		const actions = json.continuationContents?.liveChatContinuation?.actions;
 		if(IS_TESTING)
 			console.log("Live Chat Actions:", actions);
@@ -1537,7 +1567,7 @@ class YTLiveEventPager extends LiveEventPager {
 
 		//if(IS_TESTING)
 		//	console.log("LiveEvents:", this.results);
-	
+
 		return this;
 	}
 }
@@ -1595,11 +1625,11 @@ function handleYoutubeLiveEvents(actions) {
 				const redirectRenderer = bannerRenderer?.contents?.liveChatBannerRedirectRenderer;
 
 				if(bannerRenderer && redirectRenderer && bannerRenderer.bannerType == "LIVE_CHAT_BANNER_TYPE_CROSS_CHANNEL_REDIRECT") {
-					
+
 					const url = redirectRenderer.inlineActionButton?.buttonRenderer?.command?.commandMetadata?.webCommandMetadata?.url;
 					const name = redirectRenderer.bannerMessage?.runs?.find(x=>x.bold)?.text;
 					const thumbnails = redirectRenderer.authorPhoto?.thumbnails;
-					
+
 					if(url && name && thumbnails && thumbnails.length && thumbnails.length > 0)
 						events.push(new LiveEventRaid(URL_BASE + url, name, thumbnails[thumbnails.length - 1]?.url));
 				}
@@ -1675,14 +1705,16 @@ function extractLiveMessage_Obj(obj) {
 }
 
 class YTCommentPager extends CommentPager {
-	constructor(comments, continuation, contextUrl) {
+	constructor(comments, continuation, contextUrl, useLogin, useMobile) {
 		super(comments, continuation != null, contextUrl);
+		this.useLogin = !!useLogin;
+		this.useMobile = !!useMobile;
 		this.continuation = continuation;
 	}
 	nextPage() {
 		if(!this.continuation)
 			return new CommentPager([], false);
-		return requestCommentPager(this.context, this.continuation) ?? new CommentPager([], false);
+		return requestCommentPager(this.context, this.continuation, this.useLogin, this.useMobile) ?? new CommentPager([], false);
 	}
 }
 class YTComment extends Comment {
@@ -1698,7 +1730,7 @@ class RichGridPager extends VideoPager {
 		this.useMobile = useMobile;
 		this.useAuth = useAuth;
 	}
-	
+
 	nextPage() {
 		this.context.page = this.context.page + 1;
 		if(this.continuation) {
@@ -1742,7 +1774,7 @@ class SearchItemSectionVideoPager extends VideoPager {
 		super(itemSection.videos, itemSection.videos.length > 0 && !!itemSection.continuation);
 		this.continuation = itemSection.continuation;
 	}
-	
+
 	nextPage() {
 		this.context.page = this.context.page + 1;
 		if(this.continuation) {
@@ -1823,7 +1855,7 @@ function getAuthContextHeaders(useMobile = false, contentType = null) {
 		"x-goog-pageid": clientContext.DELEGATED_SESSION_ID,
 		"x-origin": useMobile ? URL_BASE_M : URL_BASE,
 		"x-youtube-client-name": useMobile ? "2" : "1",
-		"User-Agent": useMobile ? USER_AGENT_TABLET : USER_AGENT_WINDOWS 
+		"User-Agent": useMobile ? USER_AGENT_TABLET : USER_AGENT_WINDOWS
 	};
 	if(contentType)
 	    result["Content-Type"] = contentType;
@@ -1849,13 +1881,22 @@ function requestGuide(pageId) {
 	const data = JSON.parse(res.body);
 	return data;
 }
-function requestNext(body, useAuth = false) {
+function requestNext(body, useAuth = false, useMobile = false) {
 	const clientContext = getClientContext(useAuth);
 	if(!clientContext || !clientContext.INNERTUBE_CONTEXT || !clientContext.INNERTUBE_API_KEY)
 		throw new ScriptException("Missing client context");
 	body.context = clientContext.INNERTUBE_CONTEXT;
-	const url = URL_NEXT + "?key=" + clientContext.INNERTUBE_API_KEY + "&prettyPrint=false";
-	const resp = http.POST(url, JSON.stringify(body), {"Content-Type": "application/json"});
+	const baseUrl = (useMobile) ? URL_NEXT_MOBILE : URL_NEXT;
+	const url = baseUrl + "?key=" + clientContext.INNERTUBE_API_KEY + "&prettyPrint=false";
+	let headers = (!bridge.isLoggedIn() && useAuth) ? {} : getAuthContextHeaders(useMobile);
+	headers["Content-Type"] = "application/json";
+	if(useMobile) {
+		headers["User-Agent"] = USER_AGENT_TABLET;
+	}
+	if(useAuth) {
+		headers["x-goog-authuser"] = clientContext.SESSION_INDEX ?? "0";
+	}
+	const resp = http.POST(url, JSON.stringify(body), headers, useAuth);
 	if(!resp.isOk) {
 		log("Fail Url: " + url + "\nFail Body:\n" + JSON.stringify(body));
 		throw new ScriptException("Failed to next [" + resp.code + "]");
@@ -1872,7 +1913,7 @@ function requestBrowse(body, useMobile = false, useAuth = false, attempt = 0) {
 	if(useMobile)
 		headers["User-Agent"] = USER_AGENT_TABLET;
 	headers["Content-Type"] = "application/json";
- 
+
 	const baseUrl = !useMobile ? URL_BROWSE : URL_BROWSE_MOBILE;
 	const url = baseUrl + "?key=" + clientContext.INNERTUBE_API_KEY + "&prettyPrint=false";
 	const resp = http.POST(url, JSON.stringify(body), headers, useAuth);
@@ -1902,7 +1943,7 @@ function requestSearch(query, useAuth = false, params = null) {
 	};
 	if(params)
 	    body.params = params;
-	
+
 	const resp = http.POST(URL_SEARCH + "?key=" + clientContext.INNERTUBE_API_KEY + "&prettyPrint=false",
 		JSON.stringify(body), {
 			"User-Agent": USER_AGENT_WINDOWS,
@@ -1921,7 +1962,7 @@ function requestSearchContinuation(continuation, useAuth = false) {
 		context: clientContext.INNERTUBE_CONTEXT,
 		continuation: continuation
 	};
-	
+
 	const resp = http.POST(URL_SEARCH + "?key=" + clientContext.INNERTUBE_API_KEY + "&prettyPrint=false",
 		JSON.stringify(body), {
 			"Content-Type": "application/json"
@@ -2021,9 +2062,9 @@ function requestIOSStreamingData(videoId) {
 
 	const token = randomString(12);
 	const clientContext = getClientContext(false);
-	const url = URL_PLAYER + 
+	const url = URL_PLAYER +
 		"?key=" + clientContext.INNERTUBE_API_KEY +
-		"&prettyPrint=false" + 
+		"&prettyPrint=false" +
 		"&t=" + token +
 		"&id=" + videoId
 
@@ -2064,9 +2105,9 @@ function requestAndroidStreamingData(videoId) {
 
 	const token = randomString(12);
 	const clientContext = getClientContext(false);
-	const url = URL_PLAYER + 
+	const url = URL_PLAYER +
 		"?key=" + clientContext.INNERTUBE_API_KEY +
-		"&prettyPrint=false" + 
+		"&prettyPrint=false" +
 		"&t=" + token +
 		"&id=" + videoId
 
@@ -2113,9 +2154,9 @@ function requestTvHtml5EmbedStreamingData(videoId, sts) {
 
 	const token = randomString(12);
 	const clientContext = getClientContext(false);
-	const url = URL_PLAYER + 
+	const url = URL_PLAYER +
 		"?key=" + clientContext.INNERTUBE_API_KEY +
-		"&prettyPrint=false" + 
+		"&prettyPrint=false" +
 		"&t=" + token +
 		"&id=" + videoId
 
@@ -2163,7 +2204,7 @@ function getInitialData(html, useAuth = false) {
 		const initialDataRaw = match[1].startsWith("'") && match[1].endsWith("'") ?
 			decodeHexEncodedString(match[1].substring(1, match[1].length - 1))
 				//TODO: Find proper decoding strat
-				.replaceAll("\\\\\"", "\\\"") : 
+				.replaceAll("\\\\\"", "\\\"") :
 			match[1];
 		let initialData = null;
 		try{
@@ -2173,8 +2214,8 @@ function getInitialData(html, useAuth = false) {
 			console.log("Failed to parse initial data: ", initialDataRaw);
 			throw ex;
 		}
-		
-		
+
+
 		if(clientContext?.INNERTUBE_CONTEXT && !clientContext.INNERTUBE_CONTEXT.client.visitorData &&
 			initialData.responseContext?.webResponseContextExtensionData?.ytConfigData?.visitorData) {
 				clientContext.INNERTUBE_CONTEXT.client.visitorData = initialData.responseContext?.webResponseContextExtensionData?.ytConfigData?.visitorData
@@ -2282,9 +2323,9 @@ function extractGuide_Channels(data) {
 	return channels;
 }
 function extractGuideEntry_AuthorLink(guideEntryRenderer) {
-	const thumbnail = guideEntryRenderer.thumbnail?.thumbnails?.length > 0 ? 
+	const thumbnail = guideEntryRenderer.thumbnail?.thumbnails?.length > 0 ?
 		guideEntryRenderer.thumbnail.thumbnails[0].url : null;
-	const name = guideEntryRenderer.formattedTitle?.simpleText ?? 
+	const name = guideEntryRenderer.formattedTitle?.simpleText ??
 		guideEntryRenderer.accessibility?.accessibilityData?.label;
 	const url = guideEntryRenderer.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl ?
 		URL_BASE + guideEntryRenderer.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl : null;
@@ -2436,7 +2477,7 @@ function deArrow_findBest(objects) {
 
 /**
  * Extracts a PlatformChannel from a channel page's initial data
- * @param initialData Initial data from a ChannelPage 
+ * @param initialData Initial data from a ChannelPage
  * @returns {PlatformChannel}
  */
 function extractChannel_PlatformChannel(initialData, sourceUrl = null) {
@@ -2489,6 +2530,7 @@ function extractChannel_PlatformChannel(initialData, sourceUrl = null) {
         const id = initialData?.metadata?.channelMetadataRenderer?.externalId;
         if(!id) {
             log("ID not found in new channel viewmodel:" + JSON.stringify(id, null, "   "));
+	        if(bridge.devSubmit) bridge.devSubmit("extractChannel_PlatformChannel - ID Not found in new channel view model", JSON.stringify(initialData));
             throw new ScriptException("ID Not found in new channel view model");
         }
 
@@ -2527,6 +2569,7 @@ function extractChannel_PlatformChannel(initialData, sourceUrl = null) {
     }
     else {
         log("Missing header: (" + sourceUrl + ")\n" + JSON.stringify(initialData, null, "   "));
+	    if(bridge.devSubmit) bridge.devSubmit("extractChannel_PlatformChannel - No header for " + sourceUrl, JSON.stringify(initialData));
         throw new ScriptException("No header for " + sourceUrl);
     }
 }
@@ -2534,11 +2577,14 @@ function extractChannel_PlatformChannel(initialData, sourceUrl = null) {
  * Extracts multiple tabs from a page that contains a tab rendering
  * @param initialData Initial data from a page with a TwoColumnBrowseResultsRenderer
  * @param contextData Any context values used to fill out data for resulting objects
- * @returns 
+ * @returns
  */
 function extractPage_Tabs(initialData, contextData) {
 	const content = initialData.contents;
-	if(!content) throw new ScriptException("Missing contents");
+	if(!content) {
+	    if(bridge.devSubmit) bridge.devSubmit("extractPage_Tabs - Missing contents", JSON.stringify(initialData));
+	    throw new ScriptException("Missing contents");
+	}
 
 	return switchKey(content, {
 		twoColumnBrowseResultsRenderer(renderer) {
@@ -2548,6 +2594,7 @@ function extractPage_Tabs(initialData, contextData) {
 			return extractSingleColumnBrowseResultsRenderer_Tabs(renderer, contextData);
 		},
 		default(name) {
+	        if(bridge.devSubmit) bridge.devSubmit("extractPage_Tabs - Unknown renderer type: " + name, JSON.stringify(content));
 			throw new ScriptException("Unknown renderer type: " + name);
 		}
 	});
@@ -2556,7 +2603,7 @@ function extractPage_Tabs(initialData, contextData) {
 
 
 //#region Layout Extractors
-function extractVideoPage_VideoDetails(initialData, initialPlayerData, contextData, jsUrl) {
+function extractVideoPage_VideoDetails(initialData, initialPlayerData, contextData, jsUrl, useLogin) {
 	const contents = initialData.contents;
 	const contentsContainer = contents.twoColumnWatchNextResults?.results?.results ??
 		null;
@@ -2608,7 +2655,7 @@ function extractVideoPage_VideoDetails(initialData, initialPlayerData, contextDa
 						signatureCipher: y.signatureCipher
 					}, null, "   "));
 				}
-				
+
 				let url = decryptUrlN(y.url, jsUrl, logItag) ?? decryptUrl(y.cipher, jsUrl, logItag) ?? decryptUrl(y.signatureCipher, jsUrl, logItag);
 				if(url.indexOf("&cpn=") < 0)
 					url = url + "&cpn=" + nonce;
@@ -2644,7 +2691,7 @@ function extractVideoPage_VideoDetails(initialData, initialPlayerData, contextDa
 				let url = decryptUrlN(y.url, jsUrl) ?? decryptUrl(y.cipher, jsUrl) ?? decryptUrl(y.signatureCipher, jsUrl);
 				if(url.indexOf("&cpn=") < 0)
 					url = url + "&cpn=" + nonce;
-				
+
 				const duration = parseInt(parseInt(y.approxDurationMs) / 1000);
 				if(isNaN(duration))
 					return null;
@@ -2744,7 +2791,7 @@ function extractVideoPage_VideoDetails(initialData, initialPlayerData, contextDa
 					video.isLive = true;
 				else
 					video.isLive = false;
-				
+
 
 				if(renderer.videoActions?.menuRenderer?.topLevelButtons)
 					renderer.videoActions.menuRenderer.topLevelButtons.forEach((button)=>{
@@ -2782,8 +2829,10 @@ function extractVideoPage_VideoDetails(initialData, initialPlayerData, contextDa
                                         video.rating = new RatingLikes(num);
                                     else if(buttonViewModel.title?.toLowerCase() == "like")
                                         video.rating = new RatingLikes(0);
-                                    else
+                                    else {
+	                                    if(bridge.devSubmit) bridge.devSubmit("extractVideoPage_VideoDetails - Found unknown likes model", JSON.stringify(buttonViewModel));
                                         throw new ScriptException("Found unknown likes model, please report to dev:\n" + JSON.stringify(buttonViewModel.title));
+                                    }
 							    }
 							    else
 							        log("UNKNOWN LIKES MODEL:\n" + JSON.stringify(renderer, null, "   "));
@@ -2794,7 +2843,7 @@ function extractVideoPage_VideoDetails(initialData, initialPlayerData, contextDa
 
 				if(!video.datetime || video.datetime <= 0) {
 					let date = 0;
-					
+
 					if (date <= 0 && renderer.relativeDateText?.simpleText)
 						date = extractAgoText_Timestamp(renderer.relativeDateText.simpleText);
 					if(date <= 0 && renderer.dateText?.simpleText)
@@ -2816,14 +2865,16 @@ function extractVideoPage_VideoDetails(initialData, initialPlayerData, contextDa
 	}
 
 	const scheduledTime = initialPlayerData?.playabilityStatus?.liveStreamability?.liveStreamabilityRenderer?.offlineSlate?.liveStreamOfflineSlateRenderer?.scheduledStartTime;
-	
+
 	if(scheduledTime && !isNaN(scheduledTime))
 		video.datetime = parseInt(scheduledTime);
 
     const result = new PlatformVideoDetails(video);
-    result.getComments = function() {
-        return extractTwoColumnWatchNextResultContents_CommentsPager(contextData.url, contentsContainer?.contents)
-    };
+	if(!useLogin){
+		result.getComments = function() {
+			return extractTwoColumnWatchNextResultContents_CommentsPager(contextData.url, contentsContainer?.contents, useLogin)
+		};
+	}
     return result;
 }
 function toSRTTime(sec, withDot) {
@@ -2859,13 +2910,13 @@ function extractVideoOwnerRenderer_AuthorLink(renderer) {
 	if(renderer.subscriberCountText)
 		subscribers = extractHumanNumber_Integer(extractText_String(renderer.subscriberCountText));
 
-	return new PlatformAuthorLink(new PlatformID(PLATFORM, id, config.id, PLATFORM_CLAIMTYPE), 
+	return new PlatformAuthorLink(new PlatformID(PLATFORM, id, config.id, PLATFORM_CLAIMTYPE),
 		extractRuns_String(renderer.title.runs),
 		url,
 		bestThumbnail,
 		subscribers, membershipUrl);
 }
-function extractTwoColumnWatchNextResultContents_CommentsPager(contextUrl, contents) {
+function extractTwoColumnWatchNextResultContents_CommentsPager(contextUrl, contents, useLogin, engagementPanels) {
 	//Add additional/better details
 
 	let totalComments = 0;
@@ -2881,8 +2932,9 @@ function extractTwoColumnWatchNextResultContents_CommentsPager(contextUrl, conte
 				if(content)
 					switchKey(content, {
 						commentsEntryPointHeaderRenderer(renderer) {
-							if(renderer?.commentCount?.simpleText) {
-								totalComments = parseInt(renderer.commentCount.simpleText);
+							const commentCount = extractText_String(renderer.commentCount);
+							if(commentCount) {
+								totalComments = parseInt(commentCount);
 							}
 						},
 						continuationItemRenderer(continueRenderer) {
@@ -2894,27 +2946,38 @@ function extractTwoColumnWatchNextResultContents_CommentsPager(contextUrl, conte
 			}
 		});
 	}
+	const commentSectionPanel = engagementPanels?.find(x=>x?.engagementPanelSectionListRenderer?.panelIdentifier == "engagement-panel-comments-section");
+	const altContinuation = commentSectionPanel?.engagementPanelSectionListRenderer?.content?.sectionListRenderer?.contents
+		?.find(y=>true)?.itemSectionRenderer;
+	if(altContinuation != null && !commentsToken && altContinuation.sectionIdentifier == "comment-item-section") {
+		const continuationRenderer = altContinuation?.contents?.find(y=>true)?.continuationItemRenderer;
+		const altToken = continuationRenderer?.continuationEndpoint?.continuationCommand?.token;
+		if(altToken)
+			commentsToken = altToken;
+	}
+
 	if(!commentsToken)
 		return new CommentPager([], false);
-	return requestCommentPager(contextUrl, commentsToken) ??  new CommentPager([], false);
+	return requestCommentPager(contextUrl, commentsToken, useLogin, useLogin) ??  new CommentPager([], false);
 }
-function requestCommentPager(contextUrl, continuationToken) {
+function requestCommentPager(contextUrl, continuationToken, useLogin, useMobile) {
 	const data = requestNext({
 		continuation: continuationToken
-	});
+	}, useLogin, useMobile);
 	if(IS_TESTING)
 	    console.log("data", data);
 	const endpoints = data?.onResponseReceivedCommands ?? data?.onResponseReceivedActions ?? data?.onResponseReceivedEndpoints;
 	if(!endpoints) {
 	    log("Comment object:\n" + JSON.stringify(data, null, "   "));
+	    if(bridge.devSubmit) bridge.devSubmit("requestCommentPager - No comment endpoints", JSON.stringify(data));
 	    throw new ScriptException("No comment endpoints provided by Youtube");
 	}
+	let commentsContinuation = null;
 	for(let i = 0; i < endpoints.length; i++) {
 		const endpoint = endpoints[i];
 		const continuationItems = endpoint.reloadContinuationItemsCommand?.continuationItems ??
 			endpoint.appendContinuationItemsAction?.continuationItems;
 		if(continuationItems && continuationItems.length > 0) {
-			let commentsContinuation = null;
 			let comments = [];
 
 			if(continuationItems && continuationItems.length > 0) {
@@ -2926,14 +2989,14 @@ function requestCommentPager(contextUrl, continuationToken) {
 								return;
 
 							const replyCount = (commentRenderer.replyCount ? commentRenderer?.replyCount : 0);
-							const replyContinuation = renderer.replies?.commentRepliesRenderer?.contents?.length == 1 ?
-								renderer.replies.commentRepliesRenderer.contents[0]?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token :
+							let replyContinuation = renderer.replies?.commentRepliesRenderer?.contents?.length == 1 ?
+								(renderer.replies.commentRepliesRenderer.contents[0]?.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token
+									?? renderer.replies.commentRepliesRenderer.contents[0]?.continuationItemRenderer?.button?.buttonRenderer?.command?.continuationCommand?.token) :
 								null;
-
-							comments.push(extractCommentRenderer_Comment(contextUrl, commentRenderer, replyCount, replyContinuation));
+							comments.push(extractCommentRenderer_Comment(contextUrl, commentRenderer, replyCount, replyContinuation, useLogin, useMobile));
 						},
 						commentRenderer(renderer) {
-							comments.push(extractCommentRenderer_Comment(contextUrl, renderer, 0, null));
+							comments.push(extractCommentRenderer_Comment(contextUrl, renderer, 0, null, useLogin, useMobile));
 						},
 						continuationItemRenderer(renderer) {
 							if(renderer?.continuationEndpoint?.continuationCommand?.token)
@@ -2944,7 +3007,7 @@ function requestCommentPager(contextUrl, continuationToken) {
 					});
 				}
 				if(comments.length > 0) {
-					return new YTCommentPager(comments, commentsContinuation, contextUrl);
+					return new YTCommentPager(comments, commentsContinuation, contextUrl, useLogin, useMobile);
 				}
 			}
 		}
@@ -2954,13 +3017,12 @@ function requestCommentPager(contextUrl, continuationToken) {
 		log("New comments model");
 		const mutations = data.frameworkUpdates.entityBatchUpdate.mutations;
 		if(mutations.length > 0) {
-			let commentsContinuation = null;
 			const comments = [];
-			
+
 			let parentItems = [];
 			for(let i = 0; i < endpoints.length; i++)
 				parentItems.push(...(endpoints[i].reloadContinuationItemsCommand?.continuationItems ??
-					endpoints[i].appendContinuationItemsAction?.continuationItems ?? 
+					endpoints[i].appendContinuationItemsAction?.continuationItems ??
 					[]));
 			parentItems = parentItems.filter(x=>x.commentThreadRenderer);
 			const commentObjects = mutations.filter(x=>x?.payload?.commentEntityPayload);
@@ -2969,8 +3031,11 @@ function requestCommentPager(contextUrl, continuationToken) {
 				const cobj = commentObject?.payload?.commentEntityPayload ?? {};
 				const parent = parentItems.find(x=>x.commentThreadRenderer?.commentViewModel?.commentViewModel?.commentKey == commentObject.entityKey);
 				const replyContents = parent?.commentThreadRenderer?.replies?.commentRepliesRenderer?.contents;
-				const replyContinuation = ((replyContents?.length ?? 0) > 0) ? replyContents[0].continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token : null;
-				
+				const replyContinuation = ((replyContents?.length ?? 0) > 0) ?
+					(replyContents[0].continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token ??
+						replyContents[0].continuationItemRenderer?.button?.buttonRenderer?.command?.continuationCommand?.token) :
+					null;
+
 				const authorEndpoint = cobj.author?.channelCommand?.innertubeCommand?.commandMetadata?.webCommandMetadata?.url;
 				comments.push(new YTComment({
 					contextUrl: contextUrl,
@@ -2979,25 +3044,29 @@ function requestCommentPager(contextUrl, continuationToken) {
 					rating: new RatingLikes(extractHumanNumber_Integer(cobj.toolbar?.likeCountLiked) ?? 0),
 					date: (extractAgoTextRuns_Timestamp(cobj?.properties?.publishedTime) ?? 0),
 					replyCount: extractFirstNumber_Integer(cobj?.toolbar?.replyCount) ?? 0,
-					context: { replyContinuation: replyContinuation }
+					context: { replyContinuation: replyContinuation, useLogin: useLogin + "", useMobile: useMobile + "" }
 				}));
 			}
-			
+
 
 			if(comments.length > 0) {
-				return new YTCommentPager(comments, commentsContinuation, contextUrl);
+				return new YTCommentPager(comments, commentsContinuation, contextUrl, useLogin, useMobile);
 			}
 		}
 	}
 
 
 	log("Comment object:\n" + JSON.stringify(data, null, "   "));
+    if(bridge.devSubmit) bridge.devSubmit("requestCommentPager - No comment endpoints", JSON.stringify(data));
 	throw new ScriptException("No valid comment endpoint provided by Youtube");
 }
 
 function extractSingleColumnBrowseResultsRenderer_Tabs(renderer, contextData) {
 	const tabs = [];
-	if(!renderer.tabs) throw new ScriptException("No tabs found");
+	if(!renderer.tabs) {
+	    if(bridge.devSubmit) bridge.devSubmit("extractSingleColumnBrowseResultsRenderer_Tabs - No tabs found", JSON.stringify(renderer));
+	    throw new ScriptException("No tabs found");
+	}
 
 	for(let i = 0; i < renderer.tabs.length; i++) {
 		const tab = renderer.tabs[i];
@@ -3009,7 +3078,7 @@ function extractSingleColumnBrowseResultsRenderer_Tabs(renderer, contextData) {
 		const isDefault = tabRenderer.selected;
 		const title = tabRenderer.title;
 		const content = tabRenderer.content;
-		
+
 		if(!content)
 			continue; //.endpoint
 
@@ -3026,6 +3095,7 @@ function extractSingleColumnBrowseResultsRenderer_Tabs(renderer, contextData) {
 				tabResult = extractSectionListRenderer_Sections(renderer, contextData);
 			},
 			default() {
+			    if(bridge.devSubmit) bridge.devSubmit("extractSingleColumnBrowseResultsRenderer_Tabs - Unknown tab renderer: " + tabContentRendererName, JSON.stringify(content));
 				throw new ScriptException("Unknown tab renderer: " + tabContentRendererName);
 			}
 		});
@@ -3040,7 +3110,11 @@ function extractSingleColumnBrowseResultsRenderer_Tabs(renderer, contextData) {
 }
 function extractTwoColumnBrowseResultsRenderer_Tabs(renderer, contextData) {
 	const tabs = [];
-	if(!renderer.tabs) throw new ScriptException("No tabs found");
+	if(!renderer.tabs)
+	{
+	    if(bridge.devSubmit) bridge.devSubmit("extractTwoColumnBrowseResultsRenderer_Tabs - No tabs found", JSON.stringify(renderer));
+	    throw new ScriptException("No tabs found");
+	}
 
 	for(let i = 0; i < renderer.tabs.length; i++) {
 		const tab = renderer.tabs[i];
@@ -3052,7 +3126,7 @@ function extractTwoColumnBrowseResultsRenderer_Tabs(renderer, contextData) {
 		const isDefault = tabRenderer.selected;
 		const title = tabRenderer.title;
 		const content = tabRenderer.content;
-		
+
 		if(!content)
 			continue; //.endpoint
 
@@ -3068,6 +3142,7 @@ function extractTwoColumnBrowseResultsRenderer_Tabs(renderer, contextData) {
 				tabResult = extractSectionListRenderer_Sections(renderer, contextData)
 			},
 			default() {
+	            if(bridge.devSubmit) bridge.devSubmit("extractTwoColumnBrowseResultsRenderer_Tabs - Unknown tab renderer: " + tabContentRendererName, JSON.stringify(renderer));
 				throw new ScriptException("Unknown tab renderer: " + tabContentRendererName);
 			}
 		});
@@ -3089,7 +3164,7 @@ function extractRichGridRenderer_Shelves(richGridRenderer, contextData) {
 	let continuation = null;
 
 	for(let ci = 0; ci < contents.length; ci++) {
-		const content = contents[ci];		
+		const content = contents[ci];
 		switchKey(content, {
 			richSectionRenderer(renderer) {
 				shelves.push(extractRichSectionRenderer_Shelf(renderer, contextData));
@@ -3113,7 +3188,7 @@ function extractRichGridRenderer_Shelves(richGridRenderer, contextData) {
 			}
 		});
 	}
-	
+
 	return {
 		shelves: shelves.filter(x=>x != null),
 		videos: videos.filter(x=>x != null),
@@ -3198,7 +3273,7 @@ function extractItemSectionRenderer_Shelves(itemSectionRenderer, contextData) {
 					videos.push(video);
 			}
 		});
-		
+
 	});
 
 	return {
@@ -3308,7 +3383,7 @@ function extractRichShelfRenderer_Shelf(shelfRenderer, contextData) {
 //#region Item Extractor
 function extractRichItemRenderer_Video(itemRenderer, contextData) {
 	const content = itemRenderer.content;
-	return switchKeyVideo(content, contextData); 
+	return switchKeyVideo(content, contextData);
 }
 function extractVideoWithContextRenderer_Video(videoRenderer, contextData) {
 
@@ -3529,12 +3604,12 @@ function extractVideoRenderer_AuthorLink(videoRenderer) {
 
 	return new PlatformAuthorLink(new PlatformID(PLATFORM, id, config.id, PLATFORM_CLAIMTYPE), name, channelUrl, thumbUrl);
 }
-function extractCommentRenderer_Comment(contextUrl, commentRenderer, replyCount, replyContinuation) {
+function extractCommentRenderer_Comment(contextUrl, commentRenderer, replyCount, replyContinuation, useLogin, useMobile) {
 	const authorName = commentRenderer.authorText?.simpleText ?? "";
 	const authorEndpoint = commentRenderer.authorEndpoint?.commandMetadata?.webCommandMetadata?.url ?? "";
-	const authorThumbnail = (commentRenderer.authorThumbnail?.thumbnails ? 
+	const authorThumbnail = (commentRenderer.authorThumbnail?.thumbnails ?
 		commentRenderer.authorThumbnail.thumbnails[commentRenderer.authorThumbnail.thumbnails.length - 1].url :
-		""	
+		""
 	);
 	return new YTComment({
 		contextUrl: contextUrl,
@@ -3543,7 +3618,7 @@ function extractCommentRenderer_Comment(contextUrl, commentRenderer, replyCount,
 		rating: new RatingLikes(commentRenderer?.voteCount?.simpleText ? extractHumanNumber_Integer(commentRenderer.voteCount.simpleText) : 0),
 		date: (commentRenderer.publishedTimeText?.runs ? extractAgoTextRuns_Timestamp(commentRenderer.publishedTimeText.runs) : 0),
 		replyCount: replyCount ?? 0,
-		context: { replyContinuation: replyContinuation }
+		context: { replyContinuation: replyContinuation, useLogin: useLogin + "", useMobile: useMobile + "" }
 	})
 }
 //#endregion
@@ -3551,6 +3626,13 @@ function extractCommentRenderer_Comment(contextUrl, commentRenderer, replyCount,
 function convertIfOtherUrl(url) {
     url = convertIfShortUrl(url);
     url = convertIfEmbedUrl(url);
+    url = convertIfMusicUrl(url);
+    return url;
+}
+function convertIfMusicUrl(url) {
+    const musicMatch = url.match(REGEX_VIDEO_URL_DESKTOP);
+    if(musicMatch && musicMatch.length == 3 && musicMatch[1]?.toLowerCase() == "music")
+        url = URL_BASE + "/watch?v=" + musicMatch[1];
     return url;
 }
 function convertIfEmbedUrl(url) {
@@ -3670,6 +3752,7 @@ function extractAgoText_Timestamp(str) {
 		case "years":
 			return now - value * 60 * 60 * 24 * 365;
 		default:
+	        if(bridge.devSubmit) bridge.devSubmit("extractAgoText_Timestamp - Unknown time type: " + match[2], match[2]);
 			throw new ScriptException("Unknown time type: " + match[2]);
 	}
 }
@@ -3716,7 +3799,7 @@ function extractHumanNumber_Integer(str) {
 		return extractFirstNumber_Integer(str);
 
 	const value = parseFloat(match[1]);
-	
+
 	switch(match[2]) {
 		case "T":
 			return parseInt(1000000000000 * value);
@@ -3762,8 +3845,8 @@ function extractHumanDate_Timestamp(dateParts) {
 		if(part.length <= 2 && !isNaN(part))
 			day = parseInt(part);
 	}
-	return (day > 0 && month > 0 && year > 0) ? 
-		new Date(year + "-" + month + "-" + day).getTime() / 1000 : 
+	return (day > 0 && month > 0 && year > 0) ?
+		new Date(year + "-" + month + "-" + day).getTime() / 1000 :
 		-1;
 }
 
@@ -3867,7 +3950,7 @@ function searchQueryToSP(sort, type, filters) {
 	let filter_date = (filters?.date && filters.date.length > 0) ? filters.date[0] : null;
 	let filter_duration = (filters?.duration && filters.duration.length > 0) ? filters.duration[0] : null;
 	let filter_features = filters?.features ?? [];
-	
+
 	const sortByte = sort ? sortToByte(sort) : null;//SORT_RELEVANCE;
 
 	let arrLength = 0;
@@ -3898,7 +3981,7 @@ function searchQueryToSP(sort, type, filters) {
 	}
 	if(filterLength > 0)
 		arrLength += 2;
-	
+
 	const array = new Uint8Array(arrLength);
 	let index = 0;
 
@@ -4043,7 +4126,7 @@ function switchKey(obj, handlers) {
 			return handlers["null"];
 		return null;
 	}
-	
+
 	if(handlers[objName])
 		return handlers[objName](obj[objName]);
 	if(handlers["default"])
@@ -4097,10 +4180,10 @@ var _cipherDecode = {
 
 };
 var _nDecrypt = {
-	
+
 };
 var _sts = {
-	
+
 };
 const REGEX_CIPHERS = [
 	new RegExp("(?:\\b|[^a-zA-Z0-9$])([a-zA-Z0-9$]{2,})\\s*=\\s*function\\(\\s*a\\s*\\)\\s*\\{\\s*a\\s*=\\s*a\\.split\\(\\s*\"\"\\s*\\)"),
@@ -4202,7 +4285,7 @@ function testCiphers() {
 		try{
 			if(prepareCipher(jsUrl))
 				testResults.push("CipherTest [" + hash + "]: PASSED");
-			else 
+			else
 				testResults.push("CipherTest [" + hash + "]: FAIL");
 		}
 		catch(ex) {
@@ -4225,8 +4308,10 @@ function prepareCipher(jsUrl) {
 
 	try{
 		const playerCodeResp = http.GET(URL_BASE + jsUrl, {});
-		if(!playerCodeResp.isOk)
+		if(!playerCodeResp.isOk) {
+	        if(bridge.devSubmit) bridge.devSubmit("prepareCipher - Failed to get player js", jsUrl);
 			throw new ScriptException("Failed to get player js");
+	    }
 		console.log("Javascript Url: " + URL_BASE + jsUrl);
 		const playerCode = playerCodeResp.body;
 
@@ -4250,6 +4335,7 @@ function prepareCipher(jsUrl) {
 	}
 	catch(ex) {
 		clearCipher(jsUrl);
+        if(bridge.devSubmit) bridge.devSubmit("prepareCipher - Failed to get Cipher due to: " + ex, jsUrl);
 		throw new ScriptException("Failed to get Cipher due to: " + ex);
 	}
 }
@@ -4264,23 +4350,31 @@ function getNDecryptorFunctionCode(code, jsUrl) {
 	if(_nDecrypt[jsUrl])
 		return _nDecrypt[jsUrl];
 	const nDecryptFunctionArrNameMatch = REGEX_DECRYPT_N.exec(code);
-	if(!nDecryptFunctionArrNameMatch)
+	if(!nDecryptFunctionArrNameMatch) {
+        if(bridge.devSubmit) bridge.devSubmit("getNDecryptorFunctionCode - Failed to find n decryptor (name)", jsUrl);
 		throw new ScriptException("Failed to find n decryptor (name)");
+    }
 	const nDecryptFunctionArrName = nDecryptFunctionArrNameMatch[1];
 	const nDecryptFunctionArrIndex = parseInt(nDecryptFunctionArrNameMatch[2]);
-	
-	const nDecryptFunctionNameMatch = code.match(nDecryptFunctionArrName + "\\s*=\\s*\\[([a-zA-Z0-9,\\(,\\)\\.]+?)]");
-	if(!nDecryptFunctionNameMatch)
-		throw new ScriptException("Failed to find n decryptor (array)");
+
+	const nDecryptFunctionNameMatch = code.match(escapeRegex(nDecryptFunctionArrName) + "\\s*=\\s*\\[([$a-zA-Z0-9,\\(,\\)\\.]+?)]");
+	if(!nDecryptFunctionNameMatch) {
+        if(bridge.devSubmit) bridge.devSubmit("getNDecryptorFunctionCode - Failed to find n decryptor (array)", jsUrl);
+		throw new ScriptException("Failed to find n decryptor (array)\n" + jsUrl);
+	}
 	const nDecryptArray = nDecryptFunctionNameMatch[1].split(",");
-	if(nDecryptArray.length <= nDecryptFunctionArrIndex)
-		throw new ScriptException("Failed to find n decryptor (index)");
-	const nDecryptFunctionName = nDecryptArray[nDecryptFunctionArrIndex];
-	const nDecryptFunctionCodeMatch = code.match(nDecryptFunctionName + "=function\\(a\\)\\{[\\s\\S]*?join\\(\\\"\\\"\\)};");
-	if(!nDecryptFunctionCodeMatch)
-		throw new ScriptException("Failed to find n decryptor (code)");
-	
-	return "(function(){" + 
+	if(nDecryptArray.length <= nDecryptFunctionArrIndex) {
+        if(bridge.devSubmit) bridge.devSubmit("getNDecryptorFunctionCode - Failed to find n decryptor (index)", jsUrl);
+		throw new ScriptException("Failed to find n decryptor (index)\n" + jsUrl);
+	}
+	const nDecryptFunctionName = nDecryptArray[nDecryptFunctionArrIndex]
+	const nDecryptFunctionCodeMatch = code.match(escapeRegex(nDecryptFunctionName) + "=function\\(a\\)\\{[\\s\\S]*?join\\(\\\"\\\"\\)};");
+	if(!nDecryptFunctionCodeMatch) {
+        if(bridge.devSubmit) bridge.devSubmit("getNDecryptorFunctionCode - Failed to find n decryptor (code)", jsUrl, code);
+		throw new ScriptException("Failed to find n decryptor (code)\n" + jsUrl);
+	}
+
+	return "(function(){" +
 		"var " + nDecryptFunctionCodeMatch[0] + "\n" +
 		"return function decryptN(nEncrypted){ return " + nDecryptFunctionName + "(nEncrypted); } \n" +
 	"})()";
@@ -4297,13 +4391,16 @@ function getCipherFunctionCode(playerCode, jsUrl) {
 			break;
 		}
 	}
-	if(!cipherFunctionName)	
-		throw new ScriptException("Failed to find cipher (name)");
-	const cipherFunctionCodeMatch = playerCode.match("(" + cipherFunctionName.replace("$", "\\$") + "=function\\([a-zA-Z0-9_]+\\)\\{.+?\\})");
+	if(!cipherFunctionName)	{
+        if(bridge.devSubmit) bridge.devSubmit("getCipherFunctionCode - Failed to find cipher (name)", jsUrl);
+		throw new ScriptException("Failed to find cipher (name)\n" + jsUrl);
+	}
+	const cipherFunctionCodeMatch = playerCode.match("(" + escapeRegex(cipherFunctionName) + "=function\\([a-zA-Z0-9_]+\\)\\{.+?\\})");
 	if(!cipherFunctionCodeMatch) {
 		if(IS_TESTING)
 			console.log("Failed to find cipher function in: ", playerCode);
-		throw new ScriptException("Failed to find cipher (function)");
+        if(bridge.devSubmit) bridge.devSubmit("getCipherFunctionCode - Failed to find cipher (function)", jsUrl);
+		throw new ScriptException("Failed to find cipher (function)\n" + jsUrl);
 	}
 	const cipherFunctionCode = cipherFunctionCodeMatch[1];
 	const cipherFunctionCodeVar = "var " + cipherFunctionCode;
@@ -4311,7 +4408,8 @@ function getCipherFunctionCode(playerCode, jsUrl) {
 	if(!helperObjNameMatch) {
 		if(IS_TESTING)
 			console.log("Failed to find helper name in: ", playerCode);
-		throw new ScriptException("Failed to find helper (name)");
+        if(bridge.devSubmit) bridge.devSubmit("getCipherFunctionCode - Failed to find helper (name)", jsUrl);
+		throw new ScriptException("Failed to find helper (name)\n" + jsUrl);
 	}
 	if(IS_TESTING)
 		console.log("Cipher Code: ", cipherFunctionCode);
@@ -4320,17 +4418,18 @@ function getCipherFunctionCode(playerCode, jsUrl) {
 	if(!helperObjMatch) {
 		if(IS_TESTING)
 			console.log("Failed to find helper method [" + helperObjName + "] in: ", playerCode);
-		throw new ScriptException("Failed to extract helper (methods)");
+        if(bridge.devSubmit) bridge.devSubmit("getCipherFunctionCode - Failed to find helper (methods)", jsUrl);
+		throw new ScriptException("Failed to extract helper (methods)\n" + jsUrl);
 	}
 	const helperObj = helperObjMatch[1];
 	const functionCode = "return function decodeCipher(str){ return " + cipherFunctionName + "(str); }";
 
-	return "(function(){" + helperObj + "\n" + 
+	return "(function(){" + helperObj + "\n" +
 		cipherFunctionCodeVar + "\n" +
 		functionCode + "})()";
 }
 function escapeRegex(str) {
-	return str.replace("$", "\\$");
+	return str?.replace("$", "\\$");
 }
 
 function decodeHexEncodedString(str) {
