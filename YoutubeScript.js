@@ -219,13 +219,15 @@ source.getHome = () => {
 		initialData = requestInitialData(URL_HOME, USE_MOBILE_PAGES, true);
 	const tabs = extractPage_Tabs(initialData);
 	if(tabs.length == 0) {
-        if(bridge.devSubmit) bridge.devSubmit("getHome - No tabs found..", JSON.stringify(initialData));
+		if(bridge.devSubmit) bridge.devSubmit("getHome - No tabs found..", JSON.stringify(initialData));
 		throw new ScriptException("No tabs found..");
-    if(tabs[0].videos.length > 0) {
-			tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
-	    return new RichGridPager(tabs[0], {}, USE_MOBILE_PAGES, true);
-    } else
-        return source.getTrending();
+	}
+
+	if(tabs[0].videos.length > 0) {
+		tabs[0].videos = deArrow_enhanceVideosWithAlternativeMetadata(tabs[0].videos);
+		return new RichGridPager(tabs[0], {}, USE_MOBILE_PAGES, true);
+	} else
+		return source.getTrending();
 };
 
 source.getTrending = () => {
