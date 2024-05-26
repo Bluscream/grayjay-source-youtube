@@ -37,7 +37,7 @@ export default {
 
 	"scriptSignature": "",
 	"scriptPublicKey": "",
-	"packages": ["Http", "Utilities"],
+	"packages": ["Http", "Utilities", "DOMParser"],
 
 	"subscriptionRateLimit": 140,
 
@@ -65,14 +65,16 @@ export default {
 			"name": "Use Login for Channels",
 			"description": "Use authenticated client for channel (videos) requests. (eg. for member videos)",
 			"type": "Boolean",
-			"default": "false"
+			"default": "false",
+			"warningDialog": "Only enable this if you need it for channel membership content.\n\nTry disabling if you have issues when loading channels."
 		},
 		{
 			"variable": "authDetails",
 			"name": "Use Login for video details",
 			"description": "Use authenticated client for video requests. (eg. for member videos)",
 			"type": "Boolean",
-			"default": "false"
+			"default": "false",
+			"warningDialog": "Only enable this if you need it for channel membership content.\n\nTry disabling if you have issues when loading videos and comments."
 		},
 		{
 			"variable": "youtubeActivity",
@@ -140,6 +142,70 @@ export default {
 			"options": ["Manual", "Automatic"]
 		},
 		{
+			"variable": "sponsorBlockCat_Sponsor",
+			"name": "Skip Sponsors",
+			"description": "Skip segments labeled as sponsors",
+			"type": "Boolean",
+			"default": "true",
+			"dependency": "sponsorBlock"
+		},
+		{
+			"variable": "sponsorBlockCat_Intro",
+			"name": "Skip Intros",
+			"description": "Skip segments labeled as intros",
+			"type": "Boolean",
+			"default": "false",
+			"dependency": "sponsorBlock"
+		},
+		{
+			"variable": "sponsorBlockCat_Outro",
+			"name": "Skip Outros",
+			"description": "Skip segments labeled as outros",
+			"type": "Boolean",
+			"default": "false",
+			"dependency": "sponsorBlock"
+		},
+		{
+			"variable": "sponsorBlockCat_Self",
+			"name": "Skip Self-Promos",
+			"description": "Skip segments labeled as self-promos",
+			"type": "Boolean",
+			"default": "false",
+			"dependency": "sponsorBlock"
+		},
+		{
+			"variable": "sponsorBlockCat_Offtopic",
+			"name": "Skip Music-Offtopic",
+			"description": "Skip segments labeled as music-offtopic",
+			"type": "Boolean",
+			"default": "false",
+			"dependency": "sponsorBlock"
+		},
+		{
+			"variable": "sponsorBlockCat_Preview",
+			"name": "Skip Preview",
+			"description": "Skip segments labeled as previews",
+			"type": "Boolean",
+			"default": "false",
+			"dependency": "sponsorBlock"
+		},
+		{
+			"variable": "sponsorBlockCat_Interaction",
+			"name": "Skip Interaction",
+			"description": "Skip segments labeled as interactions",
+			"type": "Boolean",
+			"default": "false",
+			"dependency": "sponsorBlock"
+		},
+		{
+			"variable": "sponsorBlockCat_Filler",
+			"name": "Skip Fillers",
+			"description": "Skip segments labeled as fillers",
+			"type": "Boolean",
+			"default": "false",
+			"dependency": "sponsorBlock"
+		},
+		{
 			"variable": "deArrowHeader",
 			"name": "DeArrow",
 			"description": "DeArrow replaces video titles and thumbnails with better ones, which are more accurate and less prone to sensationalism (Using https://dearrow.ajay.app)\nNote: makes search very slow!",
@@ -160,6 +226,8 @@ export default {
 			"default": "true"
 		}
 	],
+
+	"developerSubmitUrl": "https://dev.grayjay.app/api/Dev/Submit",
 
 	"captcha": {
 		"userAgent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.5481.153 Mobile Safari/537.36",
